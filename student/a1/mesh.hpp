@@ -27,7 +27,7 @@ inline std::vector<Vertex> houseVertices()
     // A2 rotates/scales about this local origin, then places it at Object::position in TRS mode.
     // Center the whole house, not each roof/wall/door/window separately.
     // The starter roof below is only a drawing check; it is not a centered complete house.
-    return {{-.55f,.25f,1,.3f,.3f},{.55f,.25f,1,.3f,.3f},{0,.7f,1,.3f,.3f}};
+    return {{-1.f, 0.25f, 1, 0.3f, 0.3f},{0.55f, 0.25f, 1, 0.3f, 0.3f},{0, 0.7f, 1, 0.3f, 0.3f}};
 }
 inline std::vector<unsigned> houseIndices()
 {

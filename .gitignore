@@ -1,0 +1,31 @@
+
+# Visual Studio
+.vs/
+**/.vs/
+
+# Build directories
+build-student/
+build/
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Compiler outputs
+*.obj
+*.o
+*.pdb
+*.ilk
+*.pch
+*.ipch
+*.exe
+*.dll
+*.lib
+
+# Visual Studio generated files
+*.suo
+*.user
+*.VC.db
+*.VC.VC.opendb
