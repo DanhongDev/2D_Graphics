@@ -25,15 +25,32 @@ inline std::vector<Vertex> houseVertices()
     // Build the whole house around local (0, 0), using the center of its outer bounds
     // as the origin: (minX + maxX) / 2 = (minY + maxY) / 2 = 0.
     // A2 rotates/scales about this local origin, then places it at Object::position in TRS mode.
-    // Center the whole house, not each roof/wall/door/window separately.
+    // Center the whole house, not eac5h roof/wall/door/window separately.
     // The starter roof below is only a drawing check; it is not a centered complete house.
-    return {{-1.f, 0.25f, 1, 0.3f, 0.3f},{0.55f, 0.25f, 1, 0.3f, 0.3f},{0, 0.7f, 1, 0.3f, 0.3f}};
+    std::vector<Vertex> verts;
+    verts.push_back({ 0.5f, 0.25f, 1.f, 0.f, 0.f }); // 우상단
+    verts.push_back({ -0.5f, 0.25f, 0.f, 1.f, 0.f }); // 좌상단
+    verts.push_back({ -0.5f, -0.75f, 0.f, 0.f, 1.f }); // 좌하단
+    verts.push_back({ 0.5f, -0.75f, 1.f, 1.f, 0.f }); // 우하단
+    verts.push_back({ 0.f, 0.75f, 1.f, 0.f, 1.f }); // 지붕
+
+    verts.push_back({ -0.2f, -0.25f, 1.f, 1.f, 1.f }); // 문 우상단
+    verts.push_back({ -0.4f, -0.25f, 1.f, 1.f, 1.f }); // 문 좌상단
+    verts.push_back({ -0.4f, -0.75f, 1.f, 1.f, 1.f }); // 문 좌하단
+    verts.push_back({ -0.2f, -0.75f, 1.f, 1.f, 1.f }); // 문 우하단
+
+    verts.push_back({ 0.3f, 0.1f, 0.f, 0.f, 0.f }); // 창문 우상단
+    verts.push_back({ 0.f, 0.1f, 0.f, 0.f, 0.f }); // 창문 좌상단
+    verts.push_back({ 0.f, -0.1f, 0.f, 0.f, 0.f }); // 창문 좌하단
+    verts.push_back({ 0.3f, -0.1f, 0.f, 0.f, 0.f }); // 창문 우하단
+    return verts;
 }
 inline std::vector<unsigned> houseIndices()
 {
     // TODO A1.2: add triangle indices for all four house parts.
     // Hint: Add vertex indices to std::vector<unsigned>, with three indices per triangle.
-    return {0,1,2};
+    std::vector<unsigned> idxs = { 0,1,2, 0,2,3, 0,1,4, 5,6,7, 5,7,8, 9,10,11, 9,11,12 };
+    return idxs;
 }
 inline void createMesh(Mesh& mesh,const std::vector<Vertex>& vertices,const std::vector<unsigned>& indices)
 {
@@ -46,9 +63,42 @@ inline void createMesh(Mesh& mesh,const std::vector<Vertex>& vertices,const std:
     // TODO A1.4: create VAO, attach VBO to binding 0, attach EBO.
     // Hint: Use glCreateVertexArrays, glVertexArrayVertexBuffer(vao, binding, buffer, offset, stride), and glVertexArrayElementBuffer.
     // Binding index 0; offset 0; stride sizeof(Vertex).
+    glGenVertexArrays(1, &mesh.vao);
+    glBindVertexArray(mesh.vao);
+
+    glGenBuffers(1, &mesh.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, mesh.vbo);
+    glBufferData(
+        GL_ARRAY_BUFFER,
+        vertices.size() * sizeof(Vertex),
+        vertices.data(),
+        GL_STATIC_DRAW
+    );
+
+    glGenBuffers(1, &mesh.ebo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.ebo);
+    glBufferData(
+        GL_ELEMENT_ARRAY_BUFFER,
+        indices.size() * sizeof(unsigned),
+        indices.data(),
+        GL_STATIC_DRAW
+    );
+    
     // TODO A1.5: configure position (location 0, 2 floats) and color (location 1, 3 floats).
     // Hint: Use glVertexArrayAttribFormat, glVertexArrayAttribBinding, and glEnableVertexArrayAttrib. Use offsetof(Vertex, x) / offsetof(Vertex, r) for byte offsets.
     // Both attributes use VBO binding index 0. u/v are not enabled yet.
+    glVertexAttribPointer(
+        0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+        reinterpret_cast<void*>(offsetof(Vertex, x))
+    );
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(
+        1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+        reinterpret_cast<void*>(offsetof(Vertex, r))
+    );
+    glEnableVertexAttribArray(1);
+
     mesh.indexCount=GLsizei(indices.size());
 }
 inline void drawMesh(const Mesh& mesh)
@@ -58,4 +108,6 @@ inline void drawMesh(const Mesh& mesh)
     // TODO A1.6: bind VAO and issue the indexed draw call.
     // Hint: Use glBindVertexArray followed by glDrawElements(mode, count, type, indices), with GL_TRIANGLES, GL_UNSIGNED_INT, and nullptr for the EBO start offset.
     // Count means number of indices, not number of triangles.
+    glBindVertexArray(mesh.vao);
+    glDrawElements(GL_TRIANGLES, mesh.indexCount, GL_UNSIGNED_INT, nullptr);
 }
