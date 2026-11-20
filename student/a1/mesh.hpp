@@ -133,8 +133,7 @@ inline void createMesh(Mesh& mesh,const std::vector<Vertex>& vertices,const std:
         0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
         reinterpret_cast<void*>(offsetof(Vertex, x))
     );
-    // glVertexAttribPointer(index, size, type, normalized, stride, *pointer)
-    // 현재 VAO의 index번 Attribute는 현재 바인딩된 VBO에서의 정보를 읽는 함수.
+    // glVertexAttribPointer(index, size, type, normalized, stride, *pointer): 현재 VAO의 index번 Attribute는 현재 바인딩된 VBO에서의 정보를 읽는 함수.
     // 각 정점의 위치는 type형 size개로 구성되고 다음 정점의 위치까지는 stride 바이트 만큼 이동하며 첫번째 위치 데이터는 *pointer지점에서 시작한다.
         // index = VAO의 정점 속성 인덱스
             // glVertexAttribPointer(0, 2, ...): Attribute 0 -> 정점의 위치 (x,y)
@@ -162,6 +161,67 @@ inline void createMesh(Mesh& mesh,const std::vector<Vertex>& vertices,const std:
     glEnableVertexAttribArray(1);
     // 위와 동일
 
+    // ==========================
+    // DSA 방식 (OpenGL 4.5 이상)
+    // ==========================
+    glCreateVertexArrays(1, &mesh.vao);
+    // glCreateVertexArrays(n, *arrays): ID를 발급하면서 실제 VAO 객체까지 생성하고 초기화하는 함수
+        // glGenVertexArrays() + glBindVertexArray() 이다. 다만, 객체를 설정할 때 바인딩 의존성을 줄여주는 것일뿐, 렌더링 시 필요한 바인딩까지 전부 없애는 함수는 아니다.
+
+    glCreateBuffers(1, &mesh.vbo);
+    // glCreateBuffers(n, *buffers): 버퍼 ID를 발급하면서 실제 버퍼 객체까지 생성하고 초기화하는 함수
+        // 버퍼 객체를 생성한 것과 버퍼에 실제 정점 데이터를 저장하는 것은 별개이다.
+
+    glNamedBufferStorage(
+        mesh.vbo,
+        vertices.size() * sizeof(Vertex),
+        vertices.data(),
+        0
+    );
+    // glNamedBufferStorage(buffer, size, *data, flags): buffer를 직접 지정해서 데이터를 저장하는 함수
+        // DSA에서는 버퍼 ID를 직접 지정해서 데이터를 저장할 수 있다.
+        // buffer = 데이터를 저장할 버퍼 객체 ID
+        // size = 할당할 저장 공간의 크기
+        // *data = 복사할 CPU 데이터의 시작주소
+        // flags = 저장소 생성 옵션 (필요한 플래그는 비트 OR 연산자 '|'로 결합 가능)
+            // 0 = 추가 옵션 없음
+            // GL_DYNAMIC_STORAGE_BIT = glNamedBufferSubData() 등으로 데이터 갱신 허용
+            // GL_MAP_READ_BIT = 버퍼 저장소를 읽기 매핑할 수 있도록 허용
+            // GL_MAP_WRITE_BIT = 버퍼 저장소를 쓰기 매핑할 수 있도록 허용
+        // glNamedBufferStorage()는 불변 저장소이다. glBufferData()는 같은 버퍼 객체의 "저장 공간"을 재할당 할 수 있지만 glNamedBufferStorage()는 재할당할 수 없다. 단 데이터는 변경가능하다.
+
+    glCreateBuffers(1, &mesh.ebo);
+    glNamedBufferStorage(
+        mesh.ebo,
+        indices.size() * sizeof(unsigned),
+        indices.data(),
+        0
+    );
+
+    glVertexArrayVertexBuffer(mesh.vao, 0, mesh.vbo, 0, sizeof(Vertex));
+    // glVertexArrayVertexBuffer(vaobj, bindingindex, buffer, offset, stride): VAO의 "Binding Index"에 VBO를 연결하는 함수
+        // vaobj = 연결할 VAO ID
+        // bindingindex = VAO 내부의 버퍼 바인딩 슬롯의 번호
+        // buffer = VAO에 연결할 VBO ID
+        // offset = VBO 시작 지점에서 바인딩이 시작하는 바이트 위치
+        // stride = 같은 VBO 내부에서 다음 데이터로 이동하기 위한 바이트 간격
+
+    glVertexArrayAttribBinding(mesh.vao, 0, 0);
+    glVertexArrayAttribBinding(mesh.vao, 1, 0);
+    // glVertexArrayAttribBinding(vaobj, attribindex, bindingindex): vaobj의 attribindex번 속성을 bindingindex번에 연결하는 함수
+
+    glVertexArrayAttribFormat(mesh.vao, 0, 2, GL_FLOAT, GL_FALSE, offsetof(Vertex, x));
+    // glVertexArrayAttribFormat(vaobj, attribindex, size, type, normalized, relativeoffset): vaobj의 attribindex번의 속성 형식을 결정하는 함수
+        // relativeoffset = BindingOffset을 기준으로 하는 상대적인 위치
+            // 데이터 위치 = BindingOffset + VertexIndex * stride + RelativeOffset
+
+    glEnableVertexArrayAttrib(mesh.vao, 0);
+    // glEnableVertexArrayAttrib(vaobj, index): 연결할 vaobj를 지정하고 해당 VAO의 index번 attribute를 활성화하는 함수
+    glVertexArrayElementBuffer(mesh.vao, mesh.ebo);
+    // glVertexArrayElementBuffer(vaobj, buffer): vaobj에 buffer(ebo)를 연결
+
+    
+    
     mesh.indexCount=GLsizei(indices.size());
     // draw할 인덱스 개수를 기억하기 위해 indexCount에 저장 (drawMesh()함수 에는 indices를 매개변수로 안 받기 때문.)
 }
