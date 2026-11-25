@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "course.hpp"
+
 using namespace course;
 namespace Wiki
 {
@@ -32,6 +33,15 @@ namespace Wiki
     //     Attribute attributes[MAX_ATTRIBUTES];
     //     GLuint elementBuffer;
     // };
+    // Shader
+    //   입력받은 정점 데이터 등을 어떻게 처리할지 정의하는 GPU 프로그램이다.
+    //   VertexShader는 주로 정점 변환을, FragmentShader는 주로 색상 계산을 수행한다.
+    // Shader Program
+    //   여러 Shader 단계의 객체를 첨부하고 링크하여 구성한 프로그램이다.
+    //   실행 코드와 Uniform 상태 등을 관리한다.
+    // Shader와 Shader Program의 관계
+    //   하나의 Shader Program에는 서로 다른 단계의 Shader들을 첨부할 수 있다. (단, 같은 Shader 단계에 속하는 Shader 객체 여러개를 동시에 첨부할 수는 없다.)
+    //   하나의 Shader 객체를 여러 Shader Program에서 재사용할 수도 있다.
 
     // ============================================================================
     // 1. VAO 생성 및 선택
@@ -235,6 +245,602 @@ namespace Wiki
     //
     // 과제에서 쓰인 require(mesh.vao == 0, "...")는 OpenGL API가 아니라
     // course.hpp가 제공하는 검증 유틸리티이다.
+
+    // ============================================================================
+    // 7. Shader 객체 및 Shader Program
+    // ============================================================================
+    //
+    // [기본 개념]
+    //
+    // Shader Object:
+    //   특정 Shader 단계의 GLSL 소스 코드 및 컴파일 결과를 관리하는 객체.
+    //   예: Vertex Shader, Fragment Shader.
+    //
+    // Shader Program Object:
+    //   Shader 객체들을 Attach한 뒤 Link하여 구성하는 프로그램 객체.
+    //   링크된 실행 코드와 Uniform 값 등의 상태를 관리한다.
+    //
+    // Shader 생성 과정:
+    //   1. GLSL 소스 코드 준비
+    //   2. glCreateShader()     -> Shader 객체 생성
+    //   3. glShaderSource()     -> GLSL 소스 저장
+    //   4. glCompileShader()    -> Shader 컴파일
+    //   5. glCreateProgram()    -> Program 객체 생성
+    //   6. glAttachShader()     -> Shader 객체 첨부
+    //   7. glLinkProgram()      -> Program 링크
+    //   8. glUseProgram()       -> Program 활성화
+    //
+    // 주의:
+    //   Compile과 Link는 반드시 성공 여부를 확인해야 한다.
+    //   Attach는 연결할 Shader를 등록하는 과정이고,
+    //   Link는 실제로 Shader들을 연결하고 프로그램을 완성하는 과정이다.
+
+    // ----------------------------------------------------------------------------
+    // glCreateShader(GLenum type)
+    //
+    //   역할: 지정한 종류의 Shader 객체를 생성하고 Shader ID를 반환.
+    //
+    //   type = 생성할 Shader의 종류.
+    //          GL_VERTEX_SHADER   : 정점 처리
+    //          GL_FRAGMENT_SHADER : Fragment 색상 등의 계산
+    //          GL_GEOMETRY_SHADER : Primitive 처리
+    //          GL_COMPUTE_SHADER  : 범용 GPU 계산
+    //
+    //   반환값:
+    //     GLuint 형태의 Shader 객체 ID.
+    //     생성에 실패하면 0을 반환한다.
+    //
+    //   주의:
+    //     Shader 객체만 생성하며 GLSL 소스 코드가 자동으로 저장되거나
+    //     컴파일되는 것은 아니다.
+    //
+    // 예시:
+    //   GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    //   GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    
+    
+    // ----------------------------------------------------------------------------
+    // glShaderSource(
+    //     GLuint shader,
+    //     GLsizei count,
+    //     const GLchar* const* string,
+    //     const GLint* length
+    // )
+    //
+    //   역할: GLSL 소스 코드를 지정한 Shader 객체에 복사하여 저장.
+    //
+    //   shader = GLSL 소스를 저장할 Shader 객체 ID.
+    //
+    //   count  = 전달할 소스 문자열의 개수.
+    //            문자열 하나라면 1을 사용한다.
+    //
+    //   string = 소스 문자열 포인터들을 담은 배열의 시작 주소.
+    //            문자열 하나만 전달하더라도 문자열 포인터의 주소가 필요하다.
+    //
+    //   length = 각 문자열의 길이를 저장한 배열의 주소.
+    //            nullptr이면 각 문자열의 null 종료 문자('\0')를 기준으로
+    //            길이를 판단한다.
+    //
+    //   주의:
+    //     glShaderSource()는 GLSL 코드를 컴파일하지 않는다.
+    //     실제 컴파일은 glCompileShader()에서 수행한다.
+    //
+    //     std::string을 사용할 경우 c_str()을 통해
+    //     const char* 형태의 문자열 포인터를 얻을 수 있다.
+    //
+    // 예시:
+    //   std::string sourceText = readShaderFile("scene.vert");
+    //   const char* source = sourceText.c_str();
+    //
+    //   glShaderSource(vertexShader, 1, &source, nullptr);
+    
+    
+    // ----------------------------------------------------------------------------
+    // glCompileShader(GLuint shader)
+    //
+    //   역할: Shader 객체에 저장된 GLSL 소스 코드를 컴파일.
+    //
+    //   shader = 컴파일할 Shader 객체 ID.
+    //
+    //   주의:
+    //     함수를 호출했다고 반드시 컴파일에 성공하는 것은 아니다.
+    //     glGetShaderiv()로 GL_COMPILE_STATUS를 확인해야 한다.
+    //
+    // 예시:
+    //   glCompileShader(vertexShader);
+    
+    
+    // ----------------------------------------------------------------------------
+    // glGetShaderiv(GLuint shader, GLenum pname, GLint* params)
+    //
+    //   역할: Shader 객체의 특정 상태 정보를 조회.
+    //
+    //   shader = 상태를 조회할 Shader 객체 ID.
+    //
+    //   pname  = 조회할 상태의 종류.
+    //            GL_COMPILE_STATUS : 컴파일 성공 여부
+    //            GL_INFO_LOG_LENGTH: 진단 로그의 길이
+    //            GL_SHADER_TYPE    : Shader 종류
+    //
+    //   params = 조회한 결과를 저장할 변수의 메모리 주소.
+    //
+    //   주의:
+    //     GL_COMPILE_STATUS는 GL_TRUE 또는 GL_FALSE를 반환한다.
+    //
+    // 예시:
+    //   GLint success = GL_FALSE;
+    //   glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+    //
+    //   if (success != GL_TRUE) {
+    //       // 컴파일 실패 처리
+    //   }
+    
+    
+    // ----------------------------------------------------------------------------
+    // glGetShaderInfoLog(
+    //     GLuint shader,
+    //     GLsizei maxLength,
+    //     GLsizei* length,
+    //     GLchar* infoLog
+    // )
+    //
+    //   역할: Shader 컴파일 과정에서 생성된 진단 로그를 조회.
+    //
+    //   shader    = 조회할 Shader 객체 ID.
+    //
+    //   maxLength = infoLog 버퍼에 저장할 수 있는 최대 문자 수(Byte).
+    //
+    //   length    = 실제 기록된 문자 수를 저장할 변수의 주소.
+    //               필요하지 않으면 nullptr 사용 가능.
+    //
+    //   infoLog   = 진단 로그 문자열을 저장할 메모리 버퍼.
+    //
+    //   주의:
+    //     컴파일 실패 시 오류 원인을 확인하는 데 사용한다.
+    //     컴파일 성공 여부는 GL_COMPILE_STATUS로 판단한다.
+    //
+    // 예시:
+    //   char infoLog[1024] = {};
+    //   glGetShaderInfoLog(vertexShader, 1024, nullptr, infoLog);
+    
+    
+    // ----------------------------------------------------------------------------
+    // glCreateProgram()
+    //
+    //   역할: 새로운 Shader Program 객체를 생성하고 ID를 반환.
+    //
+    //   매개변수: 없음.
+    //
+    //   반환값:
+    //     GLuint 형태의 Shader Program ID.
+    //     생성에 실패하면 0을 반환한다.
+    //
+    //   주의:
+    //     빈 Shader Program 객체를 생성하는 함수이다.
+    //     Shader를 자동으로 첨부하거나 링크하지 않는다.
+    //
+    // 예시:
+    //   GLuint program = glCreateProgram();
+    
+    
+    // ----------------------------------------------------------------------------
+    // glAttachShader(GLuint program, GLuint shader)
+    //
+    //   역할: Shader 객체를 Shader Program 객체에 첨부.
+    //
+    //   program = Shader를 첨부할 Shader Program 객체 ID.
+    //
+    //   shader  = 첨부할 Shader 객체 ID.
+    //
+    //   주의:
+    //     Attach는 Shader 객체를 Program에 등록하는 작업이다.
+    //     실제 링크는 glLinkProgram()을 호출해야 수행된다.
+    //
+    //     하나의 Shader 객체를 여러 Program에 첨부할 수 있다.
+    //     일반적인 프로그램에서는 동일 Shader 단계의 객체를
+    //     하나의 Program에 중복 첨부할 수 없다.
+    //
+    // 예시:
+    //   glAttachShader(program, vertexShader);
+    //   glAttachShader(program, fragmentShader);
+    
+    
+    // ----------------------------------------------------------------------------
+    // glLinkProgram(GLuint program)
+    //
+    //   역할: Program에 첨부된 Shader 객체들을 링크하여
+    //         실행 가능한 Shader Program을 구성.
+    //
+    //   program = 링크할 Shader Program 객체 ID.
+    //
+    //   주요 작업:
+    //     - Shader 단계 간 입력/출력 인터페이스 검사
+    //     - Attribute 및 Uniform 등의 리소스 정보 결정
+    //     - Shader 단계들을 연결하여 실행 준비
+    //
+    //   주의:
+    //     Link에 실패하면 해당 프로그램을 정상적으로 사용할 수 없다.
+    //     GL_LINK_STATUS로 성공 여부를 확인해야 한다.
+    //
+    //     성공적으로 다시 링크하면 일반 Uniform 값이 초기화되고,
+    //     Uniform Location도 변경될 수 있다.
+    //
+    // 예시:
+    //   glLinkProgram(program);
+    
+    
+    // ----------------------------------------------------------------------------
+    // glGetProgramiv(GLuint program, GLenum pname, GLint* params)
+    //
+    //   역할: Shader Program 객체의 상태 정보를 조회.
+    //
+    //   program = 상태를 조회할 Shader Program ID.
+    //
+    //   pname   = 조회할 상태의 종류.
+    //             GL_LINK_STATUS      : 링크 성공 여부
+    //             GL_INFO_LOG_LENGTH  : 진단 로그 길이
+    //             GL_ATTACHED_SHADERS : 첨부된 Shader 개수
+    //
+    //   params  = 조회한 결과를 저장할 변수의 주소.
+    //
+    // 예시:
+    //   GLint success = GL_FALSE;
+    //   glGetProgramiv(program, GL_LINK_STATUS, &success);
+    
+    
+    // ----------------------------------------------------------------------------
+    // glGetProgramInfoLog(
+    //     GLuint program,
+    //     GLsizei maxLength,
+    //     GLsizei* length,
+    //     GLchar* infoLog
+    // )
+    //
+    //   역할: Shader Program의 링크 관련 진단 로그를 조회.
+    //
+    //   program   = 조회할 Shader Program ID.
+    //
+    //   maxLength = 로그를 저장할 버퍼의 최대 크기(Byte).
+    //
+    //   length    = 실제 기록된 문자 수를 저장할 변수의 주소.
+    //               불필요하면 nullptr 가능.
+    //
+    //   infoLog   = 로그를 저장할 메모리 버퍼.
+    //
+    // 예시:
+    //   char infoLog[1024] = {};
+    //   glGetProgramInfoLog(program, 1024, nullptr, infoLog);
+    
+    
+    // ----------------------------------------------------------------------------
+    // glUseProgram(GLuint program)
+    //
+    //   역할: 현재 OpenGL Context에서 사용할 Shader Program을 선택.
+    //
+    //   program = 활성화할 Shader Program ID.
+    //             0을 전달하면 현재 Program 사용을 해제한다.
+    //
+    //   주의:
+    //     성공적으로 링크된 Program을 사용해야 한다.
+    //     glUseProgram()은 Program 객체를 삭제하지 않는다.
+    //
+    //     다른 Program을 활성화하더라도 이전 Program의 Uniform 값은 유지된다.
+    //     실제 Shader 실행은 이후 Draw Call 등에서 이루어진다.
+    //
+    // 예시:
+    //   glUseProgram(program);
+    
+    
+    // ----------------------------------------------------------------------------
+    // glDetachShader(GLuint program, GLuint shader)
+    //
+    //   역할: Program에 첨부된 Shader 객체를 분리.
+    //
+    //   program = 대상 Shader Program ID.
+    //   shader  = 분리할 Shader 객체 ID.
+    //
+    //   주의:
+    //     링크에 성공한 Program에서는 Shader를 분리해도
+    //     이미 링크된 실행 코드를 계속 사용할 수 있다.
+    //
+    // 예시:
+    //   glDetachShader(program, vertexShader);
+    
+    
+    // ----------------------------------------------------------------------------
+    // glDeleteShader(GLuint shader)
+    //
+    //   역할: Shader 객체를 삭제 대상으로 지정.
+    //
+    //   shader = 삭제할 Shader 객체 ID.
+    //
+    //   주의:
+    //     Shader가 Program에 첨부되어 있다면 실제 삭제는
+    //     해당 Shader가 모든 Program에서 분리된 이후 이루어진다.
+    //
+    // 예시:
+    //   glDeleteShader(vertexShader);
+    
+    
+    // ----------------------------------------------------------------------------
+    // glDeleteProgram(GLuint program)
+    //
+    //   역할: Shader Program 객체를 삭제 대상으로 지정.
+    //
+    //   program = 삭제할 Shader Program ID.
+    //
+    //   주의:
+    //     현재 사용 중인 Program은 사용이 해제될 때 실제 삭제된다.
+    //     Program 삭제는 Buffer나 VAO 삭제와 별개의 작업이다.
+    //
+    // 예시:
+    //   glDeleteProgram(program);
+
+    // ============================================================================
+    // 8. Uniform
+    // ============================================================================
+    //
+    // [기본 개념]
+    //
+    // Uniform:
+    //   GLSL에서 선언하는 프로그램 공통 입력 변수.
+    //
+    //   CPU 측 OpenGL 코드에서 값을 설정하고,
+    //   Shader가 실행될 때 해당 값을 읽어서 계산에 사용한다.
+    //
+    // 예시 (GLSL):
+    //   uniform mat4 uMVP;
+    //   uniform vec4 uColor;
+    //   uniform float uTime;
+    //
+    // 특징:
+    //   - Vertex Attribute와 달리 정점마다 자동으로 값이 바뀌지 않는다.
+    //   - 동일 Draw Call 동안 모든 Shader 실행에서 같은 값을 사용한다.
+    //   - Uniform 값은 Shader Program 객체에 저장된다.
+    //   - Program을 비활성화해도 Uniform 값이 유지된다.
+    //   - 성공적으로 다시 링크하면 일반 Uniform 값이 초기화된다.
+    //
+    // Uniform 설정 과정:
+    //   1. Shader Program 링크
+    //   2. glGetUniformLocation()으로 Uniform 위치 조회
+    //   3. glUseProgram()으로 Program 활성화
+    //   4. glUniform*()으로 Uniform 값 설정
+    //
+    // DSA 스타일에서는 glProgramUniform*()을 이용하여
+    // Program을 활성화하지 않고도 특정 Program의 값을 설정할 수 있다.
+    
+    
+    // ----------------------------------------------------------------------------
+    // glGetUniformLocation(GLuint program, const GLchar* name)
+    //
+    //   역할: 지정한 Shader Program 내부에서 Uniform Location 조회.
+    //
+    //   program = Uniform을 조회할 Shader Program 객체 ID.
+    //
+    //   name    = Uniform 변수의 이름.
+    //             GLSL에 선언한 변수 이름과 일치해야 한다.
+    //
+    //   반환값:
+    //     GLint 형태의 Uniform Location.
+    //
+    //     -1 : 해당 이름의 활성 Uniform이 존재하지 않거나
+    //          최적화 등에 의해 제거되어 위치를 조회할 수 없는 경우.
+    //
+    //   주의:
+    //     Uniform Location은 Program마다 독립적으로 관리된다.
+    //     서로 다른 Program에서 같은 이름을 사용해도 Location은 다를 수 있다.
+    //
+    //     Program을 다시 링크하면 Location을 다시 조회해야 한다.
+    //
+    //     Location은 CPU 메모리 주소나 GPU 메모리 주소가 아니라
+    //     Program 내부의 Uniform을 식별하는 번호이다.
+    //
+    // 예시:
+    //   GLint location = glGetUniformLocation(program, "uMVP");
+    
+    
+    // ----------------------------------------------------------------------------
+    // glUniform1f(GLint location, GLfloat v0)
+    //
+    //   역할: 현재 활성화된 Program의 float Uniform에 값 하나 설정.
+    //
+    //   location = Uniform Location.
+    //   v0       = 전달할 float 값.
+    //
+    // 예시 (GLSL):
+    //   uniform float uTime;
+    //
+    // 예시 (C++):
+    //   glUniform1f(location, 1.5f);
+    
+    
+    // ----------------------------------------------------------------------------
+    // glUniform2f(GLint location, GLfloat v0, GLfloat v1)
+    //
+    //   역할: 현재 활성화된 Program의 vec2 Uniform 값 설정.
+    //
+    //   location = Uniform Location.
+    //   v0       = 첫 번째 float 성분.
+    //   v1       = 두 번째 float 성분.
+    //
+    // 예시 (GLSL):
+    //   uniform vec2 uPosition;
+    //
+    // 예시 (C++):
+    //   glUniform2f(location, 0.5f, 0.25f);
+    
+    
+    // ----------------------------------------------------------------------------
+    // glUniform3f(GLint location, GLfloat v0, GLfloat v1, GLfloat v2)
+    //
+    //   역할: 현재 활성화된 Program의 vec3 Uniform 값 설정.
+    //
+    //   location = Uniform Location.
+    //   v0       = 첫 번째 float 성분.
+    //   v1       = 두 번째 float 성분.
+    //   v2       = 세 번째 float 성분.
+    //
+    // 예시 (GLSL):
+    //   uniform vec3 uColor;
+    //
+    // 예시 (C++):
+    //   glUniform3f(location, 1.0f, 0.0f, 0.0f);
+    
+    
+    // ----------------------------------------------------------------------------
+    // glUniform4f(
+    //     GLint location,
+    //     GLfloat v0,
+    //     GLfloat v1,
+    //     GLfloat v2,
+    //     GLfloat v3
+    // )
+    //
+    //   역할: 현재 활성화된 Program의 vec4 Uniform 값 설정.
+    //
+    //   location = Uniform Location.
+    //   v0       = 첫 번째 float 성분.
+    //   v1       = 두 번째 float 성분.
+    //   v2       = 세 번째 float 성분.
+    //   v3       = 네 번째 float 성분.
+    //
+    //   주의:
+    //     glUniform4f()는 float 성분 네 개를 전달하는 함수다.
+    //     mat4 Uniform을 설정하는 함수가 아니다.
+    //
+    // 예시 (GLSL):
+    //   uniform vec4 uColor;
+    //
+    // 예시 (C++):
+    //   glUniform4f(location, 1.0f, 0.0f, 0.0f, 1.0f);
+    
+    
+    // ----------------------------------------------------------------------------
+    // glUniform1i(GLint location, GLint v0)
+    //
+    //   역할: 현재 활성화된 Program의 int Uniform 값 설정.
+    //
+    //   location = Uniform Location.
+    //   v0       = 전달할 정수 값.
+    //
+    //   주의:
+    //     bool, sampler 계열 Uniform을 설정할 때도 사용한다.
+    //
+    // 예시 (GLSL):
+    //   uniform int uMode;
+    //
+    // 예시 (C++):
+    //   glUniform1i(location, 2);
+    
+    
+    // ----------------------------------------------------------------------------
+    // glUniformMatrix4fv(
+    //     GLint location,
+    //     GLsizei count,
+    //     GLboolean transpose,
+    //     const GLfloat* value
+    // )
+    //
+    //   역할: 현재 활성화된 Shader Program의 mat4 Uniform에
+    //         4x4 float 행렬 데이터를 전달.
+    //
+    //   location  = Uniform Location.
+    //
+    //   count     = 전달할 4x4 행렬의 개수.
+    //               mat4 하나를 전달할 경우 1.
+    //
+    //   transpose = 행렬 전치 여부.
+    //               GL_FALSE : 전치하지 않음.
+    //               GL_TRUE  : 전치하여 전달.
+    //
+    //   value     = 행렬 데이터가 저장된 메모리의 시작 주소.
+    //               float 배열 또는 glm::value_ptr() 등을 사용한다.
+    //
+    //   주의:
+    //     GLSL의 mat4 Uniform에 사용할 수 있다.
+    //     GL_FALSE는 정규화 여부가 아니라 전치 여부를 의미한다.
+    //
+    //     GLM의 일반적인 행렬 메모리 배치에서는 GL_FALSE를 사용한다.
+    //
+    // 예시 (GLSL):
+    //   uniform mat4 uMVP;
+    //
+    // 예시 (C++):
+    //   glUniformMatrix4fv(
+    //       location,
+    //       1,
+    //       GL_FALSE,
+    //       glm::value_ptr(MVP)
+    //   );
+    
+    
+    // ----------------------------------------------------------------------------
+    // glProgramUniformMatrix4fv(
+    //     GLuint program,
+    //     GLint location,
+    //     GLsizei count,
+    //     GLboolean transpose,
+    //     const GLfloat* value
+    // )
+    //
+    //   역할: 지정한 Shader Program의 mat4 Uniform 값을 직접 설정.
+    //
+    //   program   = Uniform을 설정할 Shader Program ID.
+    //
+    //   location  = 해당 Program에서 조회한 Uniform Location.
+    //
+    //   count     = 전달할 행렬 개수.
+    //
+    //   transpose = 행렬 전치 여부.
+    //
+    //   value     = 행렬 데이터가 저장된 메모리의 시작 주소.
+    //
+    //   특징:
+    //     - glUseProgram()을 호출하지 않아도 Uniform을 설정할 수 있다.
+    //     - 현재 활성화된 Shader Program은 변경되지 않는다.
+    //     - 지정한 Program의 Uniform 상태만 변경한다.
+    //
+    //   주의:
+    //     location은 반드시 해당 Program에서 조회한 값을 사용해야 한다.
+    //     Program은 성공적으로 링크된 상태여야 한다.
+    //
+    // 예시:
+    //   GLint locB = glGetUniformLocation(programB, "uMVP");
+    //
+    //   glProgramUniformMatrix4fv(
+    //       programB,
+    //       locB,
+    //       1,
+    //       GL_FALSE,
+    //       glm::value_ptr(MVP)
+    //   );
+    
+    
+    // ----------------------------------------------------------------------------
+    // glProgramUniform4f(
+    //     GLuint program,
+    //     GLint location,
+    //     GLfloat v0,
+    //     GLfloat v1,
+    //     GLfloat v2,
+    //     GLfloat v3
+    // )
+    //
+    //   역할: 지정한 Shader Program의 vec4 Uniform 값을 직접 설정.
+    //
+    //   program  = Uniform 값을 설정할 Program ID.
+    //   location = 해당 Program의 Uniform Location.
+    //   v0       = 첫 번째 float 성분.
+    //   v1       = 두 번째 float 성분.
+    //   v2       = 세 번째 float 성분.
+    //   v3       = 네 번째 float 성분.
+    //
+    // 예시:
+    //   glProgramUniform4f(
+    //       program,
+    //       location,
+    //       1.0f, 0.0f, 0.0f, 1.0f
+    //   );
 }
 
 struct Mesh 
@@ -254,6 +860,10 @@ struct Mesh
 namespace FunctionExample
 {
     // ============================================================================
+    // VAO, VBO, EBO
+    // ============================================================================
+
+    // ============================================================================
     // A. 기존 방식 — 참고 예제 (기존 glGen*/glBind*/glVertexAttribPointer)
     // ============================================================================
     inline void createMeshLegacy(Mesh& mesh, const std::vector<Vertex>& vertices, const std::vector<unsigned>& indices)
@@ -268,22 +878,18 @@ namespace FunctionExample
         // 2. VBO 객체 생성 + 3. 저장소 할당
         glGenBuffers(1, &mesh.vbo);
         glBindBuffer(GL_ARRAY_BUFFER, mesh.vbo);
-        glBufferData(GL_ARRAY_BUFFER,
-            vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
 
         // 4. Attribute 0 (위치), Attribute 1 (색상) 설정 + 활성화
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-            reinterpret_cast<void*>(offsetof(Vertex, x)));
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, x)));
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-            reinterpret_cast<void*>(offsetof(Vertex, r)));
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, r)));
         glEnableVertexAttribArray(1);
 
         // 5. EBO 생성 + 저장소 할당 (현재 VAO에 EBO 연결도 저장)
         glGenBuffers(1, &mesh.ebo);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-            indices.size() * sizeof(unsigned), indices.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned), indices.data(), GL_STATIC_DRAW);
 
         mesh.indexCount = GLsizei(indices.size());
     }
@@ -301,26 +907,22 @@ namespace FunctionExample
 
         // 2. VBO/EBO 생성 + 3. 불변 저장소 초기 데이터 복사
         glCreateBuffers(1, &mesh.vbo);
-        glNamedBufferStorage(mesh.vbo,
-            vertices.size() * sizeof(Vertex), vertices.data(), 0);
+        glNamedBufferStorage(mesh.vbo, vertices.size() * sizeof(Vertex), vertices.data(), 0);
 
         glCreateBuffers(1, &mesh.ebo);
-        glNamedBufferStorage(mesh.ebo,
-            indices.size() * sizeof(unsigned), indices.data(), 0);
+        glNamedBufferStorage(mesh.ebo, indices.size() * sizeof(unsigned), indices.data(), 0);
 
         // 4. Binding[0]에 VBO 연결 + VAO에 EBO 연결
         glVertexArrayVertexBuffer(mesh.vao, 0, mesh.vbo, 0, sizeof(Vertex));
         glVertexArrayElementBuffer(mesh.vao, mesh.ebo);
 
         // 5. Attribute[0] = 위치, Binding[0] 사용
-        glVertexArrayAttribFormat(mesh.vao, 0, 2, GL_FLOAT, GL_FALSE,
-            offsetof(Vertex, x));
+        glVertexArrayAttribFormat(mesh.vao, 0, 2, GL_FLOAT, GL_FALSE, offsetof(Vertex, x));
         glVertexArrayAttribBinding(mesh.vao, 0, 0);
         glEnableVertexArrayAttrib(mesh.vao, 0);
 
         // 6. Attribute[1] = 색상, Binding[0] 사용
-        glVertexArrayAttribFormat(mesh.vao, 1, 3, GL_FLOAT, GL_FALSE,
-            offsetof(Vertex, r));
+        glVertexArrayAttribFormat(mesh.vao, 1, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex, r));
         glVertexArrayAttribBinding(mesh.vao, 1, 0);
         glEnableVertexArrayAttrib(mesh.vao, 1);
 
@@ -353,6 +955,285 @@ namespace FunctionExample
     // 실제 그리기   : 양쪽 동일, glBindVertexArray + glDrawElements
     // 자원 해제     : 양쪽 동일, glDeleteVertexArrays + glDeleteBuffers
 
+    // ============================================================================
+    // Shader / Uniform
+    // ============================================================================
+    
+    // ============================================================================
+    // A. Shader 파일 읽기 — 기존 방식과 DSA 공통
+    // ============================================================================
+    inline std::string readShaderFile(const std::string& path)
+    {
+        std::ifstream file(path);
+
+        if (!file.is_open())
+            throw std::runtime_error("Failed to open shader file: " + path);
+
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+
+        return buffer.str();
+    }
+
+    // ============================================================================
+    // B. Shader 객체 생성 및 컴파일 — 기존 방식과 DSA 공통
+    // ============================================================================
+    inline GLuint compileShader(GLenum type, const std::string& source)
+    {
+        // 1. Shader 객체 생성
+        GLuint shader = glCreateShader(type);
+
+        // 2. GLSL 소스 코드 저장
+        const char* src = source.c_str();
+        glShaderSource(shader, 1, &src, nullptr);
+
+        // 3. Shader 컴파일
+        glCompileShader(shader);
+
+        // 4. 컴파일 성공 여부 확인
+        GLint success = GL_FALSE;
+        glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+
+        if (success != GL_TRUE)
+        {
+            // 5. 컴파일 실패 로그 조회
+            GLint logLength = 0;
+            glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logLength);
+
+            std::string infoLog(logLength > 0 ? logLength : 1, '\0');
+            glGetShaderInfoLog(
+                shader,
+                static_cast<GLsizei>(infoLog.size()),
+                nullptr,
+                infoLog.data()
+            );
+
+            glDeleteShader(shader);
+
+            throw std::runtime_error("Shader compilation failed: " + infoLog);
+        }
+
+        return shader;
+    }
+
+    // ============================================================================
+    // C. Shader Program 생성 및 링크 — 기존 방식과 DSA 공통
+    // ============================================================================
+    inline GLuint createShaderProgram(const std::string& vertexPath, const std::string& fragmentPath)
+    {
+        // 1. GLSL 소스 파일 읽기
+        std::string vertexSource = readShaderFile(vertexPath);
+        std::string fragmentSource = readShaderFile(fragmentPath);
+
+        // 2. Vertex Shader 및 Fragment Shader 컴파일
+        GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vertexSource);
+        GLuint fragmentShader = 0;
+
+        try
+        {
+            fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragmentSource);
+        }
+        catch (...)
+        {
+            glDeleteShader(vertexShader);
+            throw;
+        }
+
+        // 3. Shader Program 객체 생성
+        GLuint program = glCreateProgram();
+
+        // 4. 컴파일된 Shader 객체들을 Program에 첨부
+        glAttachShader(program, vertexShader);
+        glAttachShader(program, fragmentShader);
+
+        // 5. Shader Program 링크
+        glLinkProgram(program);
+
+        // 6. 링크 성공 여부 확인
+        GLint success = GL_FALSE;
+        glGetProgramiv(program, GL_LINK_STATUS, &success);
+
+        if (success != GL_TRUE)
+        {
+            GLint logLength = 0;
+            glGetProgramiv(program, GL_INFO_LOG_LENGTH, &logLength);
+
+            std::string infoLog(logLength > 0 ? logLength : 1, '\0');
+            glGetProgramInfoLog(
+                program,
+                static_cast<GLsizei>(infoLog.size()),
+                nullptr,
+                infoLog.data()
+            );
+
+            glDeleteProgram(program);
+            glDeleteShader(vertexShader);
+            glDeleteShader(fragmentShader);
+
+            throw std::runtime_error("Program linking failed: " + infoLog);
+        }
+
+        // 7. 링크 완료 후 Shader 객체 분리
+        glDetachShader(program, vertexShader);
+        glDetachShader(program, fragmentShader);
+
+        // 8. Shader 객체 삭제 (링크된 Program은 유지)
+        glDeleteShader(vertexShader);
+        glDeleteShader(fragmentShader);
+
+        return program;
+    }
+
+    // ============================================================================
+    // D. 기존 방식 — Uniform 설정 (현재 활성화된 Program 사용)
+    // ============================================================================
+    inline void setUniformLegacy(GLuint program, const glm::mat4& MVP, const glm::vec4& color)
+    {
+        // 1. Shader Program 활성화
+        glUseProgram(program);
+
+        // 2. Uniform Location 조회
+        GLint mvpLocation = glGetUniformLocation(program, "uMVP");
+        GLint colorLocation = glGetUniformLocation(program, "uColor");
+
+        // 3. MVP 행렬 Uniform 설정
+        if (mvpLocation != -1)
+        {
+            glUniformMatrix4fv(
+                mvpLocation,
+                1,
+                GL_FALSE,
+                glm::value_ptr(MVP)
+            );
+        }
+
+        // 4. 색상 Uniform 설정
+        if (colorLocation != -1)
+        {
+            glUniform4f(
+                colorLocation,
+                color.r,
+                color.g,
+                color.b,
+                color.a
+            );
+        }
+    }
+
+    // ============================================================================
+    // E. DSA 스타일 — Uniform 설정 (Program 직접 지정)
+    // ============================================================================
+    inline void setUniformDSA(GLuint program, const glm::mat4& MVP, const glm::vec4& color)
+    {
+        // 1. Uniform Location 조회
+        GLint mvpLocation = glGetUniformLocation(program, "uMVP");
+        GLint colorLocation = glGetUniformLocation(program, "uColor");
+
+        // 2. MVP 행렬 Uniform 설정 (Program 활성화 불필요)
+        if (mvpLocation != -1)
+        {
+            glProgramUniformMatrix4fv(
+                program,
+                mvpLocation,
+                1,
+                GL_FALSE,
+                glm::value_ptr(MVP)
+            );
+        }
+
+        // 3. 색상 Uniform 설정 (Program 활성화 불필요)
+        if (colorLocation != -1)
+        {
+            glProgramUniform4f(
+                program,
+                colorLocation,
+                color.r,
+                color.g,
+                color.b,
+                color.a
+            );
+        }
+    }
+
+    // ============================================================================
+    // F. 기존 방식과 DSA 스타일에서 공통인 렌더링 과정
+    // ============================================================================
+    inline void drawWithProgram(GLuint program, const Mesh& mesh)
+    {
+        if (!mesh.vao) return;
+
+        // 1. Shader Program 활성화
+        glUseProgram(program);
+
+        // 2. VAO 바인딩
+        glBindVertexArray(mesh.vao);
+
+        // 3. 인덱스 기반 렌더링
+        glDrawElements(GL_TRIANGLES, mesh.indexCount, GL_UNSIGNED_INT, nullptr);
+    }
+
+    // ============================================================================
+    // G. Shader Program 자원 해제
+    // ============================================================================
+    inline void deleteShaderProgram(GLuint program)
+    {
+        glDeleteProgram(program);
+    }
+
+    // ============================================================================
+    // H. 기존 방식 <-> DSA 스타일 매칭 요약
+    // ============================================================================
+    //
+    // Shader 생성    : 양쪽 동일, glCreateShader
+    // GLSL 소스 저장 : 양쪽 동일, glShaderSource
+    // Shader 컴파일  : 양쪽 동일, glCompileShader
+    // 컴파일 확인    : 양쪽 동일, glGetShaderiv + glGetShaderInfoLog
+    // Program 생성   : 양쪽 동일, glCreateProgram
+    // Shader 첨부    : 양쪽 동일, glAttachShader
+    // Program 링크   : 양쪽 동일, glLinkProgram
+    // 링크 확인      : 양쪽 동일, glGetProgramiv + glGetProgramInfoLog
+    // Uniform 조회   : 양쪽 동일, glGetUniformLocation
+    // MVP 행렬 설정  : glUseProgram + glUniformMatrix4fv <-> glProgramUniformMatrix4fv
+    // vec4 값 설정   : glUseProgram + glUniform4f <-> glProgramUniform4f
+    // float 값 설정  : glUseProgram + glUniform1f <-> glProgramUniform1f
+    // int 값 설정    : glUseProgram + glUniform1i <-> glProgramUniform1i
+    // 실제 렌더링    : 양쪽 동일, glUseProgram + glBindVertexArray + glDrawElements
+    // Shader 분리    : 양쪽 동일, glDetachShader
+    // Shader 삭제    : 양쪽 동일, glDeleteShader
+    // Program 삭제   : 양쪽 동일, glDeleteProgram
+    //
+    // ============================================================================
+    // 핵심 개념
+    // ============================================================================
+    //
+    // 1. Shader Object
+    //    GLSL 소스 코드와 컴파일 결과를 관리하는 객체.
+    //
+    // 2. Shader Program Object
+    //    여러 Shader 단계를 링크한 결과와 Uniform 상태를 관리하는 객체.
+    //
+    // 3. glUseProgram()
+    //    현재 OpenGL Context에서 사용할 Shader Program을 선택하는 함수.
+    //
+    // 4. glGetUniformLocation()
+    //    지정한 Shader Program 안에서 Uniform의 위치를 조회하는 함수.
+    //
+    // 5. glUniform*()
+    //    현재 활성화된 Shader Program의 Uniform 값을 변경하는 함수.
+    //
+    // 6. glProgramUniform*()
+    //    Program ID를 직접 지정하여 Uniform 값을 변경하는 함수.
+    //    현재 활성화된 Program에는 영향을 주지 않는다.
+    //
+    // 7. Uniform 값은 Program 객체에 저장된다.
+    //    Program을 변경하더라도 기존 값은 유지된다.
+    //    단, 성공적으로 다시 링크하면 일반 Uniform 값이 초기화된다.
+    //
+    // 8. Uniform Location은 Program마다 독립적으로 관리된다.
+    //    동일한 이름이라도 Program마다 Location이 다를 수 있다.
+    //
+    // 9. glProgramUniform*()을 사용하더라도,
+    //    실제 렌더링할 때는 glUseProgram()으로 프로그램을 선택해야 한다.
 }
 inline std::vector<Vertex> houseVertices()
 {
@@ -365,28 +1246,31 @@ inline std::vector<Vertex> houseVertices()
     // Center the whole house, not eac5h roof/wall/door/window separately.
     // The starter roof below is only a drawing check; it is not a centered complete house.
         std::vector<Vertex> verts;
-        verts.push_back({ 0.5f, 0.25f, 1.f, 0.f, 0.f }); // 우상단
-        verts.push_back({ -0.5f, 0.25f, 0.f, 1.f, 0.f }); // 좌상단
-        verts.push_back({ -0.5f, -0.75f, 0.f, 0.f, 1.f }); // 좌하단
-        verts.push_back({ 0.5f, -0.75f, 1.f, 1.f, 0.f }); // 우하단
-        verts.push_back({ 0.f, 0.75f, 1.f, 0.f, 1.f }); // 지붕
+        verts.push_back({ 0.5f, 0.25f, 0.984f, 0.808f, 0.694f }); // 우상단
+        verts.push_back({ -0.5f, 0.25f, 0.984f, 0.808f, 0.694f }); // 좌상단
+        verts.push_back({ -0.5f, -0.75f, 0.984f, 0.808f, 0.694f }); // 좌하단
+        verts.push_back({ 0.5f, -0.75f, 0.984f, 0.808f, 0.694f }); // 우하단
 
-        verts.push_back({ -0.2f, -0.25f, 1.f, 1.f, 1.f }); // 문 우상단
-        verts.push_back({ -0.4f, -0.25f, 1.f, 1.f, 1.f }); // 문 좌상단
-        verts.push_back({ -0.4f, -0.75f, 1.f, 1.f, 1.f }); // 문 좌하단
-        verts.push_back({ -0.2f, -0.75f, 1.f, 1.f, 1.f }); // 문 우하단
+        verts.push_back({ 0.f, 0.75f, 0.f, 1.f, 0.f }); // 지붕 윗쪽
+        verts.push_back({ -0.6f, 0.25f, 0.f, 1.f, 0.f }); // 지붕 왼쪽
+        verts.push_back({ 0.6f, 0.25f, 0.f, 1.f, 0.f }); // 지붕 오른쪽
 
-        verts.push_back({ 0.3f, 0.1f, 0.f, 0.f, 0.f }); // 창문 우상단
-        verts.push_back({ 0.f, 0.1f, 0.f, 0.f, 0.f }); // 창문 좌상단
-        verts.push_back({ 0.f, -0.1f, 0.f, 0.f, 0.f }); // 창문 좌하단
-        verts.push_back({ 0.3f, -0.1f, 0.f, 0.f, 0.f }); // 창문 우하단
+        verts.push_back({ -0.2f, -0.25f, 0.588f, 0.294f, 0.f }); // 문 우상단
+        verts.push_back({ -0.4f, -0.25f, 0.588f, 0.294f, 0.f }); // 문 좌상단
+        verts.push_back({ -0.4f, -0.75f, 0.588f, 0.294f, 0.f }); // 문 좌하단
+        verts.push_back({ -0.2f, -0.75f, 0.588f, 0.294f, 0.f }); // 문 우하단
+
+        verts.push_back({ 0.3f, 0.1f, 0.529f, 0.808f, 0.922f }); // 창문 우상단
+        verts.push_back({ 0.f, 0.1f, 0.529f, 0.808f, 0.922f }); // 창문 좌상단
+        verts.push_back({ 0.f, -0.1f, 0.529f, 0.808f, 0.922f }); // 창문 좌하단
+        verts.push_back({ 0.3f, -0.1f, 0.529f, 0.808f, 0.922f }); // 창문 우하단
         return verts;
 }
 inline std::vector<unsigned> houseIndices()
 {
     // TODO A1.2: add triangle indices for all four house parts.
     // Hint: Add vertex indices to std::vector<unsigned>, with three indices per triangle.
-        std::vector<unsigned> idxs = { 0,1,2, 0,2,3, 0,1,4, 5,6,7, 5,7,8, 9,10,11, 9,11,12 };
+        std::vector<unsigned> idxs = { 0,1,2, 0,2,3, 4,5,6, 7,8,9, 7,9,10, 11,12,13, 11,13,14 };
         return idxs;
 }
 inline void createMesh(Mesh& mesh,const std::vector<Vertex>& vertices,const std::vector<unsigned>& indices)
