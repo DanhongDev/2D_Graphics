@@ -1,6 +1,241 @@
-#pragma once
+ï»¿#pragma once
 #include "course.hpp"
 using namespace course;
+namespace Wiki
+{
+    // ============================================================================
+    // 0. ìš©ì–´ ì‚¬ì „
+    // ============================================================================
+    // VAO (Vertex Array Object)
+    //   ì •ì  ì…ë ¥ ìƒíƒœ: ì •ì  ì†ì„±ì˜ í˜•ì‹/í™œì„±í™”, ì†ì„±->ë²„í¼ ë°”ì¸ë”© ì—°ê²°,
+    //   ë²„í¼ ë°”ì¸ë”© ìŠ¬ë¡¯ì˜ VBO/offset/stride, EBO ì—°ê²° ì •ë³´ë¥¼ ê´€ë¦¬í•œë‹¤.
+    // VBO (Vertex Buffer Object)
+    //   ì •ì  ìœ„ì¹˜/ìƒ‰ìƒ ë“±ì˜ ë°ì´í„°ê°€ ì €ì¥ëœ ë²„í¼ ê°ì²´ë¥¼ ë¶€ë¥´ëŠ” ê´€ìš©ì  ëª…ì¹­ì´ë‹¤.
+    // EBO (Element Buffer Object)
+    //   glDrawElementsì—ì„œ ì‚¬ìš©í•  ì¸ë±ìŠ¤ê°€ ì €ì¥ëœ ë²„í¼ ê°ì²´ë¥¼ ë¶€ë¥´ëŠ” ëª…ì¹­ì´ë‹¤.
+    // Attribute Index
+    //   ì •ì  ì…ë ¥ ì†ì„±ì˜ ë²ˆí˜¸. ì˜ˆ: 0=position, 1=color.
+    //   Vertex Shaderì˜ layout(location = n)ê³¼ ëŒ€ì‘í•œë‹¤.
+    // Binding Index
+    //   VAO ì•ˆì— ìˆëŠ” 'ì •ì  ë²„í¼ ì—°ê²° ìŠ¬ë¡¯'ì˜ ë²ˆí˜¸.
+    //   Binding[0] -> vboA ì²˜ëŸ¼ VBO ID, ì‹œì‘ offset, strideë¥¼ ê¸°ì–µí•œë‹¤.
+    //   Attribute[n] -> Binding[k]ë¡œ ì—°ê²°í•˜ë©° ì—¬ëŸ¬ Attributeê°€ ê°™ì€ Bindingì„ ì¨ë„ ëœë‹¤.
+    // Stride
+    //   ê°™ì€ ì†ì„±ì˜ ì—°ì†ëœ ì •ì  ì‚¬ì´ì˜ ë°”ì´íŠ¸ ê°„ê²©ì´ë‹¤. ë‹¤ìŒ VBOê¹Œì§€ì˜ ê°„ê²©ì´ ì•„ë‹ˆë‹¤.
+    // Relative Offset
+    //   ì •ì  ë²„í¼ Binding Offsetì„ ê¸°ì¤€ìœ¼ë¡œ í•œ ì†ì„± ì‹œì‘ ë°”ì´íŠ¸ ê±°ë¦¬ì´ë‹¤.
+    //   ì •ì  iì˜ ì†ì„± ì‹œì‘ ë°”ì´íŠ¸ = bindingOffset + i*stride + relativeOffset.
+    //
+    // ê°œë…ìƒ VAO ë‚´ë¶€ ìƒíƒœ (ì‹¤ì œ ë“œë¼ì´ë²„ êµ¬í˜„ì„ ëœ»í•˜ëŠ” ê²ƒì€ ì•„ë‹˜):
+    // struct VAOConcept {
+    //     Binding bindings[MAX_BINDINGS];
+    //     Attribute attributes[MAX_ATTRIBUTES];
+    //     GLuint elementBuffer;
+    // };
+
+    // ============================================================================
+    // 1. VAO ìƒì„± ë° ì„ íƒ
+    // ============================================================================
+    // glGenVertexArrays(GLsizei n, GLuint* arrays)
+    //   ì—­í• : ë¯¸ì‚¬ìš© VAO ì´ë¦„(ID) nê°œë¥¼ ë°œê¸‰ë°›ì•„ arraysê°€ ê°€ë¦¬í‚¤ëŠ” ë©”ëª¨ë¦¬ì— ê¸°ë¡í•œë‹¤.
+    //   n      = ë°œê¸‰ë°›ì„ VAO ID ê°œìˆ˜.
+    //   arrays = ìƒì„±ëœ ID(ë“¤)ë¥¼ ë°›ì„ GLuint ë°°ì—´ì˜ ì‹œì‘ ì£¼ì†Œ.
+    //   ì£¼ì˜: ì´ ì‹œì ì€ ì´ë¦„ ì˜ˆì•½ì´ë©°, ì‹¤ì œ VAO ê°ì²´ëŠ” ìµœì´ˆ glBindVertexArray ì‹œ ìƒì„±.
+    //   ì˜ˆ: glGenVertexArrays(1, &mesh.vao);
+    //
+    // glBindVertexArray(GLuint array)
+    //   ì—­í• : í˜„ì¬ OpenGL Contextì—ì„œ ì‚¬ìš©í•  VAOë¥¼ ì„ íƒ(ë°”ì¸ë”©)í•œë‹¤.
+    //   array = ì„ íƒí•  VAO ID. 0ì„ ì „ë‹¬í•˜ë©´ VAO ë°”ì¸ë”© í•´ì œ(Core Profileì—ì„œëŠ”
+    //           VAO ì—†ì´ ì •ì  ë°°ì—´ ê´€ë ¨ ì„¤ì •/ê·¸ë¦¬ê¸°ë¥¼ í•  ìˆ˜ ì—†ìœ¼ë¯€ë¡œ ì£¼ì˜).
+    //   ì£¼ì˜: glGenVertexArraysë¡œ ë°œê¸‰ëœ IDë¥¼ ì²˜ìŒ ë°”ì¸ë”©í•  ë•Œ VAO ê°ì²´ê°€ ìƒì„±ëœë‹¤.
+    //   ì˜ˆ: glBindVertexArray(mesh.vao);
+    //
+    // glCreateVertexArrays(GLsizei n, GLuint* arrays) [OpenGL 4.5 DSA]
+    //   ì—­í• : VAO ID nê°œë¥¼ ë°œê¸‰í•˜ê³ , ì‹¤ì œ VAO ê°ì²´ê¹Œì§€ ì¦‰ì‹œ ìƒì„±/ì´ˆê¸°í™”í•œë‹¤.
+    //   n      = ìƒì„±í•  VAO ê°œìˆ˜.
+    //   arrays = ID(ë“¤)ë¥¼ ë°›ì„ GLuint ë°°ì—´ ì£¼ì†Œ.
+    //   ì£¼ì˜: VAOë¥¼ í˜„ì¬ ë°”ì¸ë”©í•˜ì§€ ì•ŠëŠ”ë‹¤. DSA ì„¤ì •ì—ëŠ” ë°”ì¸ë”©ì´ ë¶ˆí•„ìš”í•˜ì§€ë§Œ
+    //         glDrawElements ë“± ì¼ë°˜ ê·¸ë¦¬ê¸°ì—ëŠ” glBindVertexArrayê°€ ì—¬ì „íˆ í•„ìš”.
+    //   ì˜ˆ: glCreateVertexArrays(1, &mesh.vao);
+
+    // ============================================================================
+    // 2. ë²„í¼ ê°ì²´ ìƒì„± / ë°”ì¸ë”©
+    // ============================================================================
+    // glGenBuffers(GLsizei n, GLuint* buffers)
+    //   ì—­í• : ë²„í¼ ì´ë¦„(ID) nê°œë¥¼ ì˜ˆì•½í•˜ì—¬ buffers ë°°ì—´ì— ê¸°ë¡í•œë‹¤.
+    //   n       = ë²„í¼ ID ê°œìˆ˜.
+    //   buffers = IDë¥¼ ë°›ì„ GLuint ë°°ì—´ ì£¼ì†Œ.
+    //   ì£¼ì˜: ìµœì´ˆ glBindBufferë¡œ ì‹¤ì œ ë²„í¼ ê°ì²´ê°€ ìƒì„±ëœë‹¤.
+    //
+    // glBindBuffer(GLenum target, GLuint buffer)
+    //   ì—­í• : í˜„ì¬ Contextì˜ target ë°”ì¸ë”© ì§€ì ì— ë²„í¼ IDë¥¼ ì—°ê²°í•œë‹¤.
+    //   target = GL_ARRAY_BUFFER(ì¼ë°˜ ì •ì  ë²„í¼ ì„¤ì •ì— ì‚¬ìš©),
+    //            GL_ELEMENT_ARRAY_BUFFER(í˜„ì¬ VAOì˜ ì¸ë±ìŠ¤ ë²„í¼ ì—°ê²° ìƒíƒœ) ë“±.
+    //   buffer = ì—°ê²°í•  ë²„í¼ ID. 0ì€ í•´ë‹¹ íƒ€ê¹ƒì˜ ì—°ê²°ì„ í•´ì œí•œë‹¤.
+    //   ì£¼ì˜: GL_ARRAY_BUFFER ë°”ì¸ë”© ìì²´ëŠ” VAO ìƒíƒœê°€ ì•„ë‹ˆë‹¤.
+    //         glVertexAttribPointerê°€ í˜¸ì¶œë  ë•Œ í˜„ì¬ ë°”ì¸ë”©ëœ VBO ì—°ê²°ì„ VAOì— ê¸°ë¡í•œë‹¤.
+    //         ë°˜ë©´ GL_ELEMENT_ARRAY_BUFFER ë°”ì¸ë”©ì€ í˜„ì¬ VAO ìƒíƒœì— ì €ì¥ëœë‹¤.
+    //
+    // glCreateBuffers(GLsizei n, GLuint* buffers) [OpenGL 4.5 DSA]
+    //   ì—­í• : ë²„í¼ ID nê°œë¥¼ ë°œê¸‰í•˜ë©´ì„œ ë²„í¼ ê°ì²´ë¥¼ ì¦‰ì‹œ ìƒì„±/ì´ˆê¸°í™”í•œë‹¤.
+    //   n       = ë²„í¼ ê°ì²´ ê°œìˆ˜.
+    //   buffers = IDë¥¼ ë°›ì„ GLuint ë°°ì—´ ì£¼ì†Œ.
+    //   ì£¼ì˜: ìƒì„±ë§Œ ìˆ˜í–‰í•œë‹¤. ì‹¤ì œ ë°ì´í„° ì €ì¥ì†ŒëŠ” ë³„ë„ í• ë‹¹ì´ í•„ìš”í•˜ë‹¤.
+    //         ì´ í•¨ìˆ˜ ìì²´ëŠ” VBO/EBO ìš©ë„ë¥¼ ê³ ì •í•˜ì§€ ì•ŠëŠ”ë‹¤.
+
+    // ============================================================================
+    // 3. ë²„í¼ ì €ì¥ì†Œ í• ë‹¹ / ê°±ì‹ 
+    // ============================================================================
+    // glBufferData(GLenum target, GLsizeiptr size, const void* data, GLenum usage)
+    //   ì—­í• : targetì— í˜„ì¬ ë°”ì¸ë”©ëœ ë²„í¼ì˜ ê°€ë³€ ì €ì¥ì†Œë¥¼ (ì¬)í• ë‹¹í•˜ê³  ì´ˆê¸° ë°ì´í„°ë¥¼ ë³µì‚¬.
+    //   target = GL_ARRAY_BUFFER, GL_ELEMENT_ARRAY_BUFFER ë“± ë²„í¼ ë°”ì¸ë”© ëŒ€ìƒ.
+    //   size   = ì €ì¥ì†Œ í¬ê¸°(Byte), ì˜ˆ: vertices.size()*sizeof(Vertex).
+    //   data   = ì´ˆê¸° ë°ì´í„° CPU ë©”ëª¨ë¦¬ ì£¼ì†Œ. nullptrì´ë©´ ì´ˆê¸° ë‚´ìš©ì„ ë¯¸ì§€ì • ìƒíƒœë¡œ ë‘”ë‹¤.
+    //   usage  = ì˜ˆìƒ ì‚¬ìš© íŒ¨í„´ íŒíŠ¸. GL_STATIC_DRAW, GL_DYNAMIC_DRAW, GL_STREAM_DRAW ë“±.
+    //   ì£¼ì˜: usageëŠ” ì‚¼ê°í˜•/ì„  ê°™ì€ ê·¸ë¦¬ê¸° ë„í˜• ì¢…ë¥˜ë¥¼ ì •í•˜ì§€ ì•ŠëŠ”ë‹¤.
+    //
+    // glNamedBufferData(GLuint buffer, GLsizeiptr size, const void* data, GLenum usage)
+    //   [OpenGL 4.5 DSA]
+    //   ì—­í• : ì§€ì •í•œ bufferì˜ ê°€ë³€ ì €ì¥ì†Œë¥¼ (ì¬)í• ë‹¹í•˜ê³  ì´ˆê¸° ë°ì´í„°ë¥¼ ë³µì‚¬í•œë‹¤.
+    //   buffer = ëŒ€ìƒ ë²„í¼ ID. ë²„í¼ ë°”ì¸ë”© ë¶ˆí•„ìš”.
+    //   size   = ì €ì¥ì†Œ í¬ê¸°(Byte).
+    //   data   = ì´ˆê¸° ë°ì´í„° CPU ì£¼ì†Œ(ë˜ëŠ” nullptr).
+    //   usage  = GL_STATIC_DRAW ë“± ì˜¬ë°”ë¥¸ ì‚¬ìš© íŒ¨í„´ enum. '0'ì€ ìœ íš¨í•˜ì§€ ì•Šë‹¤!
+    //   ì˜ˆ: glNamedBufferData(mesh.vbo, bytes, ptr, GL_STATIC_DRAW);
+    //
+    // glNamedBufferStorage(GLuint buffer, GLsizeiptr size, const void* data,
+    //                      GLbitfield flags) [OpenGL 4.5 DSA]
+    //   ì—­í• : ì§€ì •í•œ bufferì— ë¶ˆë³€(immutable) ì €ì¥ì†Œë¥¼ í•œ ë²ˆ ìƒì„±í•˜ê³  ì´ˆê¸° ë°ì´í„° ë³µì‚¬.
+    //   buffer = ëŒ€ìƒ ë²„í¼ ID. ë²„í¼ ë°”ì¸ë”© ë¶ˆí•„ìš”.
+    //   size   = ì €ì¥ì†Œ í¬ê¸°(Byte).
+    //   data   = ì´ˆê¸° ë°ì´í„° CPU ì£¼ì†Œ(ë˜ëŠ” nullptr).
+    //   flags  = ì €ì¥ì†Œ ì ‘ê·¼ ê¶Œí•œ/ë™ì‘ ì˜µì…˜ì˜ ë¹„íŠ¸ ì¡°í•©.
+    //            0                      = ì˜µì…˜ ì—†ì´ ìƒì„±.
+    //            GL_DYNAMIC_STORAGE_BIT = glNamedBufferSubData ë“±ì„ í†µí•œ ëª…ì‹œì  ê°±ì‹  í—ˆìš©.
+    //            GL_MAP_READ_BIT        = ì½ê¸° ë§¤í•‘ í—ˆìš©.
+    //            GL_MAP_WRITE_BIT       = ì“°ê¸° ë§¤í•‘ í—ˆìš©.
+    //            ì˜µì…˜ ê²°í•© ì˜ˆ: GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT.
+    //   ì£¼ì˜: ë¶ˆë³€ì€ 'ì €ì¥ì†Œ ì¬í• ë‹¹ ë¶ˆê°€'ë¼ëŠ” ëœ»ì´ì§€, ëª¨ë“  GPU ìˆ˜ì • ê¸ˆì§€ëŠ” ì•„ë‹ˆë‹¤.
+    //         flags=0ìœ¼ë¡œ ìƒì„±í•œ ì €ì¥ì†Œì— glNamedBufferSubDataë¥¼ í˜¸ì¶œí•˜ë©´ ì˜¤ë¥˜.
+    //         ê°™ì€ ë²„í¼ì— glNamedBufferStorageë¥¼ ì¬í˜¸ì¶œí•´ ì €ì¥ì†Œë¥¼ ë‹¤ì‹œ ë§Œë“¤ ìˆ˜ë„ ì—†ë‹¤.
+    //
+    // glBufferSubData(GLenum target, GLintptr offset, GLsizeiptr size,
+    //                 const void* data)
+    //   ì—­í• : í˜„ì¬ targetì— ë°”ì¸ë”©ëœ ë²„í¼ ì €ì¥ì†Œì˜ ì¼ë¶€ ë°”ì´íŠ¸ë¥¼ ê°±ì‹ í•œë‹¤.
+    //   target = ëŒ€ìƒ ë²„í¼ ë°”ì¸ë”© ì§€ì .
+    //   offset = ê°±ì‹  ì‹œì‘ ë°”ì´íŠ¸ ì˜¤í”„ì…‹.
+    //   size   = ê°±ì‹  ë°”ì´íŠ¸ ìˆ˜.
+    //   data   = ìƒˆ CPU ë°ì´í„° ì£¼ì†Œ.
+    //   ì£¼ì˜: ì €ì¥ì†Œê°€ ë¯¸ë¦¬ ìˆì–´ì•¼ í•˜ê³  [offset, offset+size) êµ¬ê°„ì´ ë²”ìœ„ ì•ˆì´ì–´ì•¼ í•œë‹¤.
+    //
+    // glNamedBufferSubData(GLuint buffer, GLintptr offset, GLsizeiptr size,
+    //                      const void* data) [OpenGL 4.5 DSA]
+    //   ì—­í• : ë°”ì¸ë”© ì—†ì´ ì§€ì •í•œ ë²„í¼ì˜ ë°ì´í„° ì¼ë¶€ë¥¼ ê°±ì‹ í•œë‹¤.
+    //   buffer = ëŒ€ìƒ ë²„í¼ ID.
+    //   offset = ê°±ì‹  ì‹œì‘ ë°”ì´íŠ¸ ì˜¤í”„ì…‹.
+    //   size   = ê°±ì‹  ë°”ì´íŠ¸ ìˆ˜.
+    //   data   = ìƒˆ CPU ë°ì´í„° ì£¼ì†Œ.
+    //   ì£¼ì˜: ë¶ˆë³€ ì €ì¥ì†ŒëŠ” GL_DYNAMIC_STORAGE_BITê°€ ìˆì–´ì•¼ ì´ í•¨ìˆ˜ë¡œ ê°±ì‹  ê°€ëŠ¥.
+
+    // ============================================================================
+    // 4. ì •ì  ì†ì„± ì„¤ì •: ê¸°ì¡´ ë°©ì‹
+    // ============================================================================
+    // glVertexAttribPointer(GLuint index, GLint size, GLenum type,
+    //                       GLboolean normalized, GLsizei stride, const void* pointer)
+    //   ì—­í• : í˜„ì¬ VAOì˜ Attribute[index]ì— í˜•ì‹, stride, ìƒëŒ€ì  ì‹œì‘ ìœ„ì¹˜ ë°
+    //         'í˜„ì¬ GL_ARRAY_BUFFERì— ë°”ì¸ë”©ëœ VBO' ì—°ê²°ì„ ê¸°ë¡í•œë‹¤.
+    //   index      = Attribute Index. ì…°ì´ë” layout(location=n)ê³¼ ëŒ€ì‘.
+    //   size       = ì†ì„± í•˜ë‚˜ì˜ ì„±ë¶„ ê°œìˆ˜(ë³´í†µ 1~4).
+    //   type       = ì„±ë¶„ ìë£Œí˜•, ì˜ˆ: GL_FLOAT.
+    //   normalized = ì •ìˆ˜í˜• ë°ì´í„°ë¥¼ ë¶€ë™ì†Œìˆ˜ì  ì…ë ¥ìœ¼ë¡œ ë°”ê¿€ ë•Œ ì •ê·œí™” ì—¬ë¶€.
+    //                GL_FLOATì¸ ê²½ìš° ì‚¬ì‹¤ìƒ ì˜ë¯¸ ì—†ìŒ. ë²•ì„  ë²¡í„°(Normal)ì™€ ë¬´ê´€.
+    //   stride     = ë‹¤ìŒ ì •ì ì˜ ë™ì¼ ì†ì„±ê¹Œì§€ì˜ ë°”ì´íŠ¸ ê°„ê²©(0ì´ë©´ ë°€ì§‘ ë°°ì—´ë¡œ í•´ì„).
+    //   pointer    = VBOê°€ ì—°ê²°ëœ ê²½ìš° 'VBO ë‚´ë¶€ ì‹œì‘ ë°”ì´íŠ¸ ì˜¤í”„ì…‹'ì„ í¬ì¸í„°ë¡œ í‘œí˜„.
+    //                ì˜ˆ: reinterpret_cast<void*>(offsetof(Vertex, r)).
+    //   ì£¼ì˜: GL_ARRAY_BUFFERë¥¼ ë‹¤ë¥¸ VBOë¡œ ë°”ì¸ë”©í•˜ê¸°ë§Œ í•´ì„œëŠ” VAO ì†ì„± ì—°ê²°ì´
+    //         ë³€ê²½ë˜ì§€ ì•Šê³ , ì´ í•¨ìˆ˜ë¥¼ ë‹¤ì‹œ í˜¸ì¶œí•´ì•¼ ë³€ê²½ëœë‹¤.
+    //
+    // glEnableVertexAttribArray(GLuint index)
+    //   ì—­í• : í˜„ì¬ ë°”ì¸ë”©ëœ VAOì˜ Attribute[index] ì •ì  ë°°ì—´ì„ í™œì„±í™”í•œë‹¤.
+    //   index = í™œì„±í™”í•  Attribute ë²ˆí˜¸.
+    //   ì£¼ì˜: í˜•ì‹ ì„¤ì •ê³¼ í™œì„±í™”ëŠ” ë³„ë„ ì‘ì—…ì´ë‹¤.
+
+    // ============================================================================
+    // 5. ì •ì  ì†ì„± ì„¤ì •: DSA ë°©ì‹
+    // ============================================================================
+    // glVertexArrayVertexBuffer(GLuint vaobj, GLuint bindingindex, GLuint buffer,
+    //                           GLintptr offset, GLsizei stride)
+    //   ì—­í• : vaobjì˜ Binding[bindingindex] ìŠ¬ë¡¯ì— VBO, ì‹œì‘ ìœ„ì¹˜ì™€ stride ì„¤ì •.
+    //   vaobj        = ì„¤ì •í•  VAO ID.
+    //   bindingindex = VAO ë‚´ë¶€ ì •ì  ë²„í¼ ë°”ì¸ë”© ìŠ¬ë¡¯ ë²ˆí˜¸(ì†ì„± ë²ˆí˜¸ê°€ ì•„ë‹˜).
+    //   buffer       = ì—°ê²°í•  VBO ID.
+    //   offset       = VBO ì €ì¥ì†Œ ê¸°ì¤€ ì‹œì‘ ë°”ì´íŠ¸ ì˜¤í”„ì…‹.
+    //   stride       = ì—°ì†ëœ ì •ì  ì‚¬ì´ì˜ ë°”ì´íŠ¸ ê°„ê²©.
+    //   ì£¼ì˜: ì´ í•¨ìˆ˜ë§Œìœ¼ë¡œ Attributeê°€ íŠ¹ì • Bindingì„ ì°¸ì¡°í•˜ì§€ëŠ” ì•ŠëŠ”ë‹¤.
+    //
+    // glVertexArrayAttribFormat(GLuint vaobj, GLuint attribindex, GLint size,
+    //                           GLenum type, GLboolean normalized,
+    //                           GLuint relativeoffset)
+    //   ì—­í• : vaobjì˜ Attribute[attribindex] ìë£Œí˜•/ì„±ë¶„ ìˆ˜/ì •ê·œí™”/ìƒëŒ€ ì˜¤í”„ì…‹ ì„¤ì •.
+    //   vaobj          = ì„¤ì •í•  VAO ID.
+    //   attribindex    = ì •ì  ì†ì„± ë²ˆí˜¸(ì…°ì´ë” layout(location=n)).
+    //   size           = ì„±ë¶„ ê°œìˆ˜.
+    //   type           = ì„±ë¶„ ìë£Œí˜•, ì˜ˆ: GL_FLOAT.
+    //   normalized     = ì •ìˆ˜í˜• ë°ì´í„° ì •ê·œí™” ì—¬ë¶€.
+    //   relativeoffset = Binding Offsetì„ ê¸°ì¤€ìœ¼ë¡œ í•œ ì†ì„± ì‹œì‘ ë°”ì´íŠ¸ ê±°ë¦¬.
+    //   ì£¼ì˜: ì‹¤ì œ ì‹œì‘ ìœ„ì¹˜ = bindingOffset + vertexIndex*stride + relativeoffset.
+    //
+    // glVertexArrayAttribBinding(GLuint vaobj, GLuint attribindex,
+    //                            GLuint bindingindex)
+    //   ì—­í• : Attribute[attribindex] -> Binding[bindingindex] ê´€ê³„ë¥¼ ê¸°ë¡í•œë‹¤.
+    //   vaobj        = ì„¤ì •í•  VAO ID.
+    //   attribindex  = ì†ì„± ì¸ë±ìŠ¤. 'ë¬´ì—‡ì„ ì½ëŠ”ê°€'ì™€ í˜•ì‹ì„ ì‹ë³„.
+    //   bindingindex = VBO ë°”ì¸ë”© ìŠ¬ë¡¯ ì¸ë±ìŠ¤. 'ì–´ë””ì„œ ì½ëŠ”ê°€'ë¥¼ ì„ íƒ.
+    //   ì£¼ì˜: ì—¬ëŸ¬ Attributeê°€ ê°™ì€ Bindingì„ ê³µìœ í•  ìˆ˜ ìˆë‹¤.
+    //         Binding ìŠ¬ë¡¯ì˜ VBOë¥¼ ë°”ê¾¸ë©´ ì´ë¥¼ ì°¸ì¡°í•˜ëŠ” ëª¨ë“  Attributeê°€ ì˜í–¥ì„ ë°›ëŠ”ë‹¤.
+    //
+    // glEnableVertexArrayAttrib(GLuint vaobj, GLuint index)
+    //   ì—­í• : vaobjì˜ Attribute[index] ë°°ì—´ì„ í™œì„±í™”í•œë‹¤(ë¯¸ë¦¬ VAO ë°”ì¸ë”© ë¶ˆí•„ìš”).
+    //   vaobj = ì„¤ì •í•  VAO ID.
+    //   index = í™œì„±í™”í•  Attribute ë²ˆí˜¸.
+    //
+    // glVertexArrayElementBuffer(GLuint vaobj, GLuint buffer)
+    //   ì—­í• : vaobjì— EBOë¥¼ ì§ì ‘ ì—°ê²°í•œë‹¤.
+    //   vaobj  = EBO ì—°ê²°ì„ ì €ì¥í•  VAO ID.
+    //   buffer = ì—°ê²°í•  EBO ID.
+    //   ì£¼ì˜: EBOìš© ë³„ë„ Binding Index/StrideëŠ” ì—†ë‹¤. ì¸ë±ìŠ¤ ìë£Œí˜•ê³¼ ì½ê¸° ì‹œì‘
+    //         ì˜¤í”„ì…‹ì€ glDrawElements í˜¸ì¶œì—ì„œ ì œê³µí•œë‹¤.
+
+    // ============================================================================
+    // 6. ë Œë”ë§ ë° ìì› í•´ì œ
+    // ============================================================================
+    // glDrawElements(GLenum mode, GLsizei count, GLenum type, const void* indices)
+    //   ì—­í• : í˜„ì¬ VAOì˜ EBOì—ì„œ ì¸ë±ìŠ¤ë¥¼ ì½ê³  ì •ì  ì†ì„±ì„ ì·¨í•©í•´ ê·¸ë¦¬ê¸°ë¥¼ ìˆ˜í–‰.
+    //   mode    = ê¸°ë³¸ ë„í˜• ì¡°ë¦½ ë°©ì‹. ì˜ˆ: GL_TRIANGLES.
+    //   count   = ì½ì„ ì¸ë±ìŠ¤ 'ì›ì†Œ' ê°œìˆ˜(ì‚¼ê°í˜• ê°œìˆ˜ê°€ ì•„ë‹˜).
+    //   type    = ì¸ë±ìŠ¤ ì›ì†Œ ìë£Œí˜•. ì˜ˆ: GL_UNSIGNED_INT.
+    //   indices = EBOê°€ ì—°ê²°ë˜ì–´ ìˆìœ¼ë©´ EBO ë‚´ë¶€ì˜ ì‹œì‘ 'ë°”ì´íŠ¸ ì˜¤í”„ì…‹'.
+    //             nullptrì€ 0Byteì—ì„œ ì‹œì‘í•œë‹¤ëŠ” ëœ».
+    //   ì£¼ì˜: glDrawElementsë¥¼ ìœ„í•œ VAOëŠ” glBindVertexArrayë¡œ í˜„ì¬ ë°”ì¸ë”©í•´ì•¼ í•œë‹¤.
+    //
+    // glDeleteVertexArrays(GLsizei n, const GLuint* arrays)
+    //   ì—­í• : ì§€ì •í•œ VAO ê°ì²´ë¥¼ ì‚­ì œí•œë‹¤.
+    //   n      = ì‚­ì œí•  VAO ID ê°œìˆ˜.
+    //   arrays = ì‚­ì œí•  ID ë°°ì—´ì˜ ì£¼ì†Œ.
+    //
+    // glDeleteBuffers(GLsizei n, const GLuint* buffers)
+    //   ì—­í• : ì§€ì •í•œ ë²„í¼ ê°ì²´ë“¤ì„ ì‚­ì œ ëŒ€ìƒìœ¼ë¡œ ì§€ì •í•œë‹¤.
+    //   n       = ì‚­ì œí•  ë²„í¼ ID ê°œìˆ˜.
+    //   buffers = ì‚­ì œí•  ID ë°°ì—´ ì£¼ì†Œ.
+    //   ì£¼ì˜: OpenGL Contextê°€ ì‚´ì•„ìˆëŠ” ë™ì•ˆ í˜¸ì¶œë˜ì–´ì•¼ í•œë‹¤.
+    //
+    // C++ ë³´ì¡° ì½”ë“œ: mesh.indexCount = GLsizei(indices.size());
+    //   ì—­í• : drawMeshì— ì›ë³¸ indices ë²¡í„°ë¥¼ ë„˜ê¸°ì§€ ì•Šê³ ë„ ê·¸ë¦´ ì¸ë±ìŠ¤ ê°œìˆ˜ë¥¼ ê¸°ì–µ.
+    //   GLsizei = glDrawElementsì˜ count ë§¤ê°œë³€ìˆ˜ì™€ í˜¸í™˜ë˜ëŠ” ì •ìˆ˜ ìë£Œí˜•.
+    //
+    // ê³¼ì œì—ì„œ ì“°ì¸ require(mesh.vao == 0, "...")ëŠ” OpenGL APIê°€ ì•„ë‹ˆë¼
+    // course.hppê°€ ì œê³µí•˜ëŠ” ê²€ì¦ ìœ í‹¸ë¦¬í‹°ì´ë‹¤.
+}
 
 struct Mesh 
 {
@@ -16,7 +251,109 @@ struct Mesh
         glDeleteBuffers(1,&ebo);
     }
 };
+namespace FunctionExample
+{
+    // ============================================================================
+    // A. ê¸°ì¡´ ë°©ì‹ â€” ì°¸ê³  ì˜ˆì œ (ê¸°ì¡´ glGen*/glBind*/glVertexAttribPointer)
+    // ============================================================================
+    inline void createMeshLegacy(Mesh& mesh, const std::vector<Vertex>& vertices, const std::vector<unsigned>& indices)
+    {
+        require(mesh.vao == 0, "Create each mesh only once");
+        if (vertices.empty() || indices.empty()) return;
 
+        // 1. VAO ìƒì„± ë° ë°”ì¸ë”©
+        glGenVertexArrays(1, &mesh.vao);
+        glBindVertexArray(mesh.vao);
+
+        // 2. VBO ê°ì²´ ìƒì„± + 3. ì €ì¥ì†Œ í• ë‹¹
+        glGenBuffers(1, &mesh.vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, mesh.vbo);
+        glBufferData(GL_ARRAY_BUFFER,
+            vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
+
+        // 4. Attribute 0 (ìœ„ì¹˜), Attribute 1 (ìƒ‰ìƒ) ì„¤ì • + í™œì„±í™”
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+            reinterpret_cast<void*>(offsetof(Vertex, x)));
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+            reinterpret_cast<void*>(offsetof(Vertex, r)));
+        glEnableVertexAttribArray(1);
+
+        // 5. EBO ìƒì„± + ì €ì¥ì†Œ í• ë‹¹ (í˜„ì¬ VAOì— EBO ì—°ê²°ë„ ì €ì¥)
+        glGenBuffers(1, &mesh.ebo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+            indices.size() * sizeof(unsigned), indices.data(), GL_STATIC_DRAW);
+
+        mesh.indexCount = GLsizei(indices.size());
+    }
+
+    // ============================================================================
+    // B. DSA ë°©ì‹ â€” ê³¼ì œ A1.3~A1.5 ì˜ˆì œ (OpenGL 4.5+)
+    // ============================================================================
+    inline void createMeshDSA(Mesh& mesh, const std::vector<Vertex>& vertices, const std::vector<unsigned>& indices)
+    {
+        require(mesh.vao == 0, "Create each mesh only once");
+        if (vertices.empty() || indices.empty()) return;
+
+        // 1. VAO ìƒì„± (ë°”ì¸ë”© ë¶ˆí•„ìš”)
+        glCreateVertexArrays(1, &mesh.vao);
+
+        // 2. VBO/EBO ìƒì„± + 3. ë¶ˆë³€ ì €ì¥ì†Œ ì´ˆê¸° ë°ì´í„° ë³µì‚¬
+        glCreateBuffers(1, &mesh.vbo);
+        glNamedBufferStorage(mesh.vbo,
+            vertices.size() * sizeof(Vertex), vertices.data(), 0);
+
+        glCreateBuffers(1, &mesh.ebo);
+        glNamedBufferStorage(mesh.ebo,
+            indices.size() * sizeof(unsigned), indices.data(), 0);
+
+        // 4. Binding[0]ì— VBO ì—°ê²° + VAOì— EBO ì—°ê²°
+        glVertexArrayVertexBuffer(mesh.vao, 0, mesh.vbo, 0, sizeof(Vertex));
+        glVertexArrayElementBuffer(mesh.vao, mesh.ebo);
+
+        // 5. Attribute[0] = ìœ„ì¹˜, Binding[0] ì‚¬ìš©
+        glVertexArrayAttribFormat(mesh.vao, 0, 2, GL_FLOAT, GL_FALSE,
+            offsetof(Vertex, x));
+        glVertexArrayAttribBinding(mesh.vao, 0, 0);
+        glEnableVertexArrayAttrib(mesh.vao, 0);
+
+        // 6. Attribute[1] = ìƒ‰ìƒ, Binding[0] ì‚¬ìš©
+        glVertexArrayAttribFormat(mesh.vao, 1, 3, GL_FLOAT, GL_FALSE,
+            offsetof(Vertex, r));
+        glVertexArrayAttribBinding(mesh.vao, 1, 0);
+        glEnableVertexArrayAttrib(mesh.vao, 1);
+
+        mesh.indexCount = GLsizei(indices.size());
+    }
+
+    // ============================================================================
+    // C. ê¸°ì¡´ê³¼ DSAì—ì„œ ê³µí†µì¸ ê·¸ë¦¬ê¸° ê³¼ì •
+    // ============================================================================
+    inline void drawMeshExample(const Mesh& mesh)
+    {
+        if (!mesh.vao) return;
+        glBindVertexArray(mesh.vao);
+        glDrawElements(GL_TRIANGLES, mesh.indexCount, GL_UNSIGNED_INT, nullptr);
+    }
+
+    // ============================================================================
+    // D. ê¸°ì¡´ ë°©ì‹ <-> DSA ë§¤ì¹­ ìš”ì•½
+    // ============================================================================
+    // VAO ìƒì„±      : glGenVertexArrays + ìµœì´ˆ glBindVertexArray <-> glCreateVertexArrays
+    // Buffer ìƒì„±   : glGenBuffers + ìµœì´ˆ glBindBuffer <-> glCreateBuffers
+    // ê°€ë³€ ì €ì¥ì†Œ   : glBufferData(target,...,usage) <-> glNamedBufferData(buffer,...,usage)
+    // ë¶ˆë³€ ì €ì¥ì†Œ   : glBufferStorage(target,...,flags) <-> glNamedBufferStorage(buffer,...,flags)
+    // VBO ì†ì„± ì—°ê²° : glBindBuffer(GL_ARRAY_BUFFER) + glVertexAttribPointer
+    //                 <-> glVertexArrayVertexBuffer + glVertexArrayAttribFormat + glVertexArrayAttribBinding
+    // ì†ì„± í™œì„±í™”   : glEnableVertexAttribArray <-> glEnableVertexArrayAttrib
+    // EBO ì†ì„± ì—°ê²° : glBindVertexArray + glBindBuffer(GL_ELEMENT_ARRAY_BUFFER)
+    //                 <-> glVertexArrayElementBuffer
+    // ë¶€ë¶„ ê°±ì‹      : glBufferSubData <-> glNamedBufferSubData
+    // ì‹¤ì œ ê·¸ë¦¬ê¸°   : ì–‘ìª½ ë™ì¼, glBindVertexArray + glDrawElements
+    // ìì› í•´ì œ     : ì–‘ìª½ ë™ì¼, glDeleteVertexArrays + glDeleteBuffers
+
+}
 inline std::vector<Vertex> houseVertices()
 {
     // TODO A1.1: build wall, roof, door, and window vertices (x,y,r,g,b).
@@ -27,203 +364,77 @@ inline std::vector<Vertex> houseVertices()
     // A2 rotates/scales about this local origin, then places it at Object::position in TRS mode.
     // Center the whole house, not eac5h roof/wall/door/window separately.
     // The starter roof below is only a drawing check; it is not a centered complete house.
-    std::vector<Vertex> verts;
-    verts.push_back({ 0.5f, 0.25f, 1.f, 0.f, 0.f }); // ¿ì»ó´Ü
-    verts.push_back({ -0.5f, 0.25f, 0.f, 1.f, 0.f }); // ÁÂ»ó´Ü
-    verts.push_back({ -0.5f, -0.75f, 0.f, 0.f, 1.f }); // ÁÂÇÏ´Ü
-    verts.push_back({ 0.5f, -0.75f, 1.f, 1.f, 0.f }); // ¿ìÇÏ´Ü
-    verts.push_back({ 0.f, 0.75f, 1.f, 0.f, 1.f }); // ÁöºØ
+        std::vector<Vertex> verts;
+        verts.push_back({ 0.5f, 0.25f, 1.f, 0.f, 0.f }); // ìš°ìƒë‹¨
+        verts.push_back({ -0.5f, 0.25f, 0.f, 1.f, 0.f }); // ì¢Œìƒë‹¨
+        verts.push_back({ -0.5f, -0.75f, 0.f, 0.f, 1.f }); // ì¢Œí•˜ë‹¨
+        verts.push_back({ 0.5f, -0.75f, 1.f, 1.f, 0.f }); // ìš°í•˜ë‹¨
+        verts.push_back({ 0.f, 0.75f, 1.f, 0.f, 1.f }); // ì§€ë¶•
 
-    verts.push_back({ -0.2f, -0.25f, 1.f, 1.f, 1.f }); // ¹® ¿ì»ó´Ü
-    verts.push_back({ -0.4f, -0.25f, 1.f, 1.f, 1.f }); // ¹® ÁÂ»ó´Ü
-    verts.push_back({ -0.4f, -0.75f, 1.f, 1.f, 1.f }); // ¹® ÁÂÇÏ´Ü
-    verts.push_back({ -0.2f, -0.75f, 1.f, 1.f, 1.f }); // ¹® ¿ìÇÏ´Ü
+        verts.push_back({ -0.2f, -0.25f, 1.f, 1.f, 1.f }); // ë¬¸ ìš°ìƒë‹¨
+        verts.push_back({ -0.4f, -0.25f, 1.f, 1.f, 1.f }); // ë¬¸ ì¢Œìƒë‹¨
+        verts.push_back({ -0.4f, -0.75f, 1.f, 1.f, 1.f }); // ë¬¸ ì¢Œí•˜ë‹¨
+        verts.push_back({ -0.2f, -0.75f, 1.f, 1.f, 1.f }); // ë¬¸ ìš°í•˜ë‹¨
 
-    verts.push_back({ 0.3f, 0.1f, 0.f, 0.f, 0.f }); // Ã¢¹® ¿ì»ó´Ü
-    verts.push_back({ 0.f, 0.1f, 0.f, 0.f, 0.f }); // Ã¢¹® ÁÂ»ó´Ü
-    verts.push_back({ 0.f, -0.1f, 0.f, 0.f, 0.f }); // Ã¢¹® ÁÂÇÏ´Ü
-    verts.push_back({ 0.3f, -0.1f, 0.f, 0.f, 0.f }); // Ã¢¹® ¿ìÇÏ´Ü
-    return verts;
+        verts.push_back({ 0.3f, 0.1f, 0.f, 0.f, 0.f }); // ì°½ë¬¸ ìš°ìƒë‹¨
+        verts.push_back({ 0.f, 0.1f, 0.f, 0.f, 0.f }); // ì°½ë¬¸ ì¢Œìƒë‹¨
+        verts.push_back({ 0.f, -0.1f, 0.f, 0.f, 0.f }); // ì°½ë¬¸ ì¢Œí•˜ë‹¨
+        verts.push_back({ 0.3f, -0.1f, 0.f, 0.f, 0.f }); // ì°½ë¬¸ ìš°í•˜ë‹¨
+        return verts;
 }
 inline std::vector<unsigned> houseIndices()
 {
     // TODO A1.2: add triangle indices for all four house parts.
     // Hint: Add vertex indices to std::vector<unsigned>, with three indices per triangle.
-    std::vector<unsigned> idxs = { 0,1,2, 0,2,3, 0,1,4, 5,6,7, 5,7,8, 9,10,11, 9,11,12 };
-    return idxs;
+        std::vector<unsigned> idxs = { 0,1,2, 0,2,3, 0,1,4, 5,6,7, 5,7,8, 9,10,11, 9,11,12 };
+        return idxs;
 }
 inline void createMesh(Mesh& mesh,const std::vector<Vertex>& vertices,const std::vector<unsigned>& indices)
 {
     require(mesh.vao==0,"Create each immutable mesh only once");
     if(vertices.empty()||indices.empty())
         return;
+
+    //==========
+    // DSA ver.
+    //==========
+    
     // TODO A1.3: glCreateBuffers + glNamedBufferStorage for VBO/EBO; byte sizes, flags=0.
     // Hint: Use glCreateBuffers(count, names) and glNamedBufferStorage(buffer, byteSize, data, flags). Use size() * sizeof(element type) and data().
     // Create names in mesh.vbo / mesh.ebo and upload the supplied arrays.
+        // VBO ìƒì„± + ë°ì´í„° ì €ì¥
+        glCreateBuffers(1, &mesh.vbo);
+        glNamedBufferStorage(mesh.vbo, vertices.size() * sizeof(Vertex), vertices.data(), 0);
+        // EBO ìƒì„± + ë°ì´í„° ì €ì¥
+        glCreateBuffers(1, &mesh.ebo);
+        glNamedBufferStorage(mesh.ebo, indices.size() * sizeof(unsigned), indices.data(), 0);
+
     // TODO A1.4: create VAO, attach VBO to binding 0, attach EBO.
     // Hint: Use glCreateVertexArrays, glVertexArrayVertexBuffer(vao, binding, buffer, offset, stride), and glVertexArrayElementBuffer.
     // Binding index 0; offset 0; stride sizeof(Vertex).
-    
-    // VAO: Á¤Á¡ ¹öÆÛ ¿¬°á°ú Á¤Á¡ ¼Ó¼º ÇØ¼® ¹æ¹ıµîÀ» °ü¸®ÇÏ´Â °´Ã¼
-        glGenVertexArrays(1, &mesh.vao);
-        // glGenVertexArrays(n, &arrays): VAO¸¦ ½Äº°ÇÒ ID¸¦ n°³ »ı¼ºÇÏ°í, ±× °ªÀ» arrays¿¡ ÀúÀåÇÏ´Â ÇÔ¼ö
-            // n = »ı¼ºÇÒ VAO ÀÌ¸§(ID)ÀÇ °³¼ö
-            // arrays = »ı¼ºµÈ ID¸¦ ÀúÀåÇÒ º¯¼öÀÇ ¸Ş¸ğ¸® ÁÖ¼Ò
-            // arrays´Â VAO °´Ã¼ ÀÚÃ¼°¡ ¾Æ´Ï¶ó, OpenGL¿¡¼­ VAO¸¦ ½Äº°ÇÏ´Â Á¤¼öÇü ID¸¦ ÀúÀåÇÏ´Â º¯¼öÀÌ´Ù.
-            // ID´Â OpenGLÀÌ °áÁ¤ÇÏ¹Ç·Î Ç×»ó k°¡ ³ª¿À´Â °ÍÀº ¾Æ´Ï´Ù.
+        // VAO ìƒì„±
+        glCreateVertexArrays(1, &mesh.vao);
+        // VAOì— VBO, EBO ì—°ê²°
+        glVertexArrayVertexBuffer(mesh.vao, 0, mesh.vbo, 0, sizeof(Vertex));
+        glVertexArrayElementBuffer(mesh.vao, mesh.ebo);
 
-        glBindVertexArray(mesh.vao);
-        // glBindVertexArray(array): arrays¿¡ ÀúÀåµÈ ID¸¦ ÀÌ¿ëÇØ VAO¸¦ ÇöÀç OpenGL Context¿¡ ¹ÙÀÎµùÇÏ´Â ÇÔ¼ö
-            // glGenVertexArrays()·Î ¹ß±Ş¹ŞÀº ID¸¦ Ã³À½ ¹ÙÀÎµùÇÏ¸é ½ÇÁ¦ VAO °´Ã¼¿Í ±× »óÅÂ°¡ »ı¼ºµÈ´Ù.
-
-    // VBO: ½ÇÁ¦ Á¤Á¡ µ¥ÀÌÅÍ°¡ ÀúÀåµÇ´Â GPU ¹öÆÛ
-        glGenBuffers(1, &mesh.vbo);
-        // glGenBuffers(n, &buffers): ¹öÆÛ ID¸¦ n°³ ¹ß±Ş¹Ş¾Æ buffers¿¡ ÀúÀåÇÏ´Â ÇÔ¼ö
-            // ¹öÆÛ °´Ã¼ ÀÚÃ¼¸¦ Áï½Ã »ı¼ºÇÏ´Â °ÍÀÌ ¾Æ´Ï¶ó, »ç¿ëÇÒ ID¸¦ ¿¹¾àÇÑ´Ù.
-
-        glBindBuffer(GL_ARRAY_BUFFER, mesh.vbo);
-        // glBindBuffer(target, buffer): buffer°¡ °¡¸®Å°´Â ¹öÆÛ °´Ã¼¸¦ ÇöÀç OpenGL ContextÀÇ target ¹ÙÀÎµù ÁöÁ¡¿¡ ¿¬°á
-            // target = ¹öÆÛ¸¦ ¹ÙÀÎµù ÇÒ ´ë»ó
-                // ÀÌ ¹öÆÛ¸¦ ¾î´À ¹ÙÀÎµù ÁöÁ¡¿¡ ¿¬°áÇÒ °ÍÀÎÁö ÁöÁ¤ÇÏ´Â ¿ªÇÒ
-                // GL_ARRAY_BUFFER = Á¤Á¡ÀÇ À§Ä¡, »ö»ó, ÅØ½ºÃ³ ÁÂÇ¥µîÀÇ µ¥ÀÌÅÍ
-                    // ÇöÀç OpenGL ContextÀÇ ÀÏ¹İÀûÀÎ ¹öÆÛ ¹ÙÀÎµù »óÅÂ
-            // buffer = ¹ÙÀÎµùÇÒ ¹öÆÛ °´Ã¼ÀÇ ID
-            // target ÁöÁ¡¿¡ ¹ÙÀÎµùÇß´Ù°í ÇØ¼­ ¹öÆÛ °´Ã¼°¡ ¿µ±¸ÀûÀ¸·Î VBO or EBO°¡ µÇ´Â°ÍÀÌ ¾Æ´Ï´Ù.
-            // ¹öÆÛÀÇ Å¸ÀÔÀ» ¿µ±¸ÀûÀ¸·Î °áÁ¤ÇÏ´Â ÇÔ¼ö¶ó±âº¸´Ù´Â "Æ¯Á¤ ÀÛ¾÷¿¡ »ç¿ëÇÒ ¹öÆÛ¸¦ ¼±ÅÃÇÏ´Â ÇÔ¼ö"ÀÌ´Ù.
-
-        glBufferData(
-            GL_ARRAY_BUFFER,
-            vertices.size() * sizeof(Vertex),
-            vertices.data(),
-            GL_STATIC_DRAW
-        );
-        // glBufferData(target, size, *data, usage): ÇöÀç target¿¡ ¹ÙÀÎµùµÈ ¹öÆÛ¿¡ size¸¸Å­ÀÇ ¹ÙÀÌÆ® Å©±â ÀúÀå °ø°£À» ÇÒ´çÇÏ°í *data°¡ °¡¸®Å°´Â CPU ¸Ş¸ğ¸®ÀÇ µ¥ÀÌÅÍ¸¦ º¹»çÇÑ´Ù. ±×¸®°í usage¸¦ ÅëÇØ »ç¿ë ÆĞÅÏ ÈùÆ®¸¦ Àü´ŞÇÑ´Ù
-            // target = µ¥ÀÌÅÍ¸¦ ÀúÀåÇÒ ´ë»ó ¹öÆÛÀÇ ¹ÙÀÎµù ÁöÁ¡À» ÁöÁ¤
-            // size = size¸¸Å­ÀÇ Å©±â¸¦ ÇÒ´ç
-                // vertices.size() = Á¤Á¡ °³¼ö
-                // sizeof(Vertex) = Á¤Á¡ ÇÏ³ªÀÇ Å©±â(Byte)
-            // *data = CPU ¸Ş¸ğ¸®¿¡ ÀúÀåµÈ Á¤Á¡ ¹è¿­ÀÇ ½ÃÀÛ ÁÖ¼Ò¸¦ ¹İÈ¯
-                // CPU¸Ş¸ğ¸® vertices.data() = {v0, v1, v2, ...}¸¦ OpenGL ¹öÆÛ mesh.vbo¿¡ º¹»çÇÑ´Ù.
-            // usage = ¹öÆÛÀÇ µ¥ÀÌÅÍ°¡ ¾î¶² ¹æ½ÄÀ¸·Î »ç¿ëµÉ °ÍÀ¸·Î ¿¹»óµÇ´ÂÁö OpenGL µå¶óÀÌ¹ö¿¡ ¾Ë·ÁÁÖ´Â »ç¿ë ÆĞÅÏ ÈùÆ®
-                // GL_STATIC_DRAW = µ¥ÀÌÅÍ¸¦ °ÅÀÇ ¼öÁ¤ÇÏÁö ¾Ê°í ¿©·¯ ¹ø »ç¿ë (ex. °íÁ¤µÈ ÁıÀÇ Á¤Á¡)
-                // GL_DYNAMIC_DRAW = µ¥ÀÌÅÍ¸¦ ¹İº¹ÀûÀ¸·Î ¼öÁ¤ÇÏ¸ç »ç¿ë (ex. ÀÚÁÖ ¹Ù²î´Â Á¤Á¡ µ¥ÀÌÅÍ)
-                // GL_STREAM_DRAW = µ¥ÀÌÅÍ¸¦ ¸Å¿ì ÀÚÁÖ °»½ÅÇÏ°Å³ª »õ µ¥ÀÌÅÍ·Î ±³Ã¼ (ex. ¸Å ÇÁ·¹ÀÓ »õ·Î »ı¼ºÇÏ´Â Á¤Á¡ µ¥ÀÌÅÍ)
-
-    // EBO: Á¤Á¡µéÀ» ¾î¶² ¼ø¼­·Î Á¶ÇÕÇØ¼­ »ï°¢ÇüÀ» ¸¸µéÁö ±â·ÏÇÏ´Â ¹öÆÛ
-        glGenBuffers(1, &mesh.ebo);
-        // À§¿Í µ¿ÀÏ
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.ebo);
-        // GL_ELEMENT_ARRAY_BUFFER = Á¤Á¡À» Á¶ÇÕÇÏ´Â ÀÎµ¦½º
-            // ÇöÀç ¹ÙÀÎµùµÈ "VAO"¿¡ ÀúÀåµÇ´Â »óÅÂ
-            // VAO¸¦ ¸ÕÀú ¹ÙÀÎµùÇÑ »óÅÂ¿¡¼­ EBO¸¦ ¿¬°áÇÏ¸é ³ªÁß¿¡ ÇØ´ç VAO¸¦ ´Ù½Ã ¹ÙÀÎµùÇÒ ¶§ EBO ¿¬°áµµ ÇÔ²² º¹¿øµÈ´Ù.
-        glBufferData(
-            GL_ELEMENT_ARRAY_BUFFER,
-            indices.size() * sizeof(unsigned),
-            indices.data(),
-            GL_STATIC_DRAW
-        );
-        // sizeof(unsinged) = EBO¿¡´Â Á¤Á¡ÀÇ ÀÎµ¦½ºµéÀÌ ÀúÀåµÇ°í, ÇöÀç indices º¤ÅÍÀÇ ¿ø¼Ò ÀÚ·áÇüÀÌ unsingedÀÌ±â ¶§¹®ÀÌ´Ù.
-        
-    
     // TODO A1.5: configure position (location 0, 2 floats) and color (location 1, 3 floats).
     // Hint: Use glVertexArrayAttribFormat, glVertexArrayAttribBinding, and glEnableVertexArrayAttrib. Use offsetof(Vertex, x) / offsetof(Vertex, r) for byte offsets.
     // Both attributes use VBO binding index 0. u/v are not enabled yet.
+        // VAO ì†ì„± ì„¤ì • (ìœ„ì¹˜)
+        glVertexArrayAttribFormat(mesh.vao, 0, 2, GL_FLOAT, GL_FALSE, offsetof(Vertex, x));
+        // AttributeIndexì™€ BindingIndexë¥¼ ì—°ê²°
+        glVertexArrayAttribBinding(mesh.vao, 0, 0);
+        // ì†ì„± í™œì„±í™”
+        glEnableVertexArrayAttrib(mesh.vao, 0);
+        // VAO ì†ì„± ì„¤ì • (ìƒ‰ìƒ)
+        glVertexArrayAttribFormat(mesh.vao, 1, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex, r));
+        // AttributeIndexì™€ BindingIndexë¥¼ ì—°ê²°
+        glVertexArrayAttribBinding(mesh.vao, 1, 0);
+        // ì†ì„± í™œì„±í™”
+        glEnableVertexArrayAttrib(mesh.vao, 1);
 
-    glVertexAttribPointer(
-        0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-        reinterpret_cast<void*>(offsetof(Vertex, x))
-    );
-    // glVertexAttribPointer(index, size, type, normalized, stride, *pointer): ÇöÀç VAOÀÇ index¹ø Attribute´Â ÇöÀç ¹ÙÀÎµùµÈ VBO¿¡¼­ÀÇ Á¤º¸¸¦ ÀĞ´Â ÇÔ¼ö.
-    // °¢ Á¤Á¡ÀÇ À§Ä¡´Â typeÇü size°³·Î ±¸¼ºµÇ°í ´ÙÀ½ Á¤Á¡ÀÇ À§Ä¡±îÁö´Â stride ¹ÙÀÌÆ® ¸¸Å­ ÀÌµ¿ÇÏ¸ç Ã¹¹øÂ° À§Ä¡ µ¥ÀÌÅÍ´Â *pointerÁöÁ¡¿¡¼­ ½ÃÀÛÇÑ´Ù.
-        // index = VAOÀÇ Á¤Á¡ ¼Ó¼º ÀÎµ¦½º
-            // glVertexAttribPointer(0, 2, ...): Attribute 0 -> Á¤Á¡ÀÇ À§Ä¡ (x,y)
-            // glVertexAttribPointer(1, 3, ...): Attribute 1 -> Á¤Á¡ÀÇ »ö»ó (r,g,b)
-            // Vertex Shader¿¡ ´ÙÀ½°ú °°ÀÌ ¿¬°á °¡´É
-                // layout(location = 0) in vec2 aPos, layout(location = 1) in vec3 aColor
-            // Áï, "VAOÀÇ Attribute Index¿Í ShaderÀÇ Attribute LocationÀÌ ´ëÀÀÇÏ´Â ±¸Á¶"ÀÌ´Ù.
-        // size = ¼Ó¼º ÇÏ³ª¸¦ ±¸¼ºÇÏ´Â ¼ººĞÀÇ °³¼ö
-        // type = °¢ ¼ººĞÀÇ ÀÚ·áÇü
-            // VBO ÀüÃ¼ÀÇ Å©±â°¡ ¾Æ´Ñ "À§Ä¡ ¼Ó¼º ÇÏ³ªÀÇ µ¥ÀÌÅÍ Å©±â"ÀÌ´Ù.
-        // normalized = Á¤±ÔÈ­
-            // Á¤¼öÇü Á¤Á¡ µ¥ÀÌÅÍ¸¦ ºÎµ¿¼Ò¼öÁ¡ ¼Ó¼ºÀ¸·Î ÀĞÀ» ¶§, °ªÀ» Á¤±ÔÈ­µÈ ¹üÀ§·Î º¯È¯ÇÒÁö °áÁ¤ÇÑ´Ù.
-                // ex. unsinged char r = 255; -> GL_FALSE = 255.0, GL_TRUE = 1.0
-        // stride = ¿¬¼ÓµÈ µÎ Á¤Á¡ÀÇ "µ¿ÀÏÇÑ Attribute µ¥ÀÌÅÍ ½ÃÀÛ À§Ä¡ »çÀÌÀÇ ¹ÙÀÌÆ® °£°İ"
-        // *pointer = Á¤Á¡ ±¸Á¶Ã¼ ³»ºÎ¿¡¼­ ÇØ´ç ¼Ó¼ºÀÌ ½ÃÀÛÇÏ´Â À§Ä¡
-            // offsetof(Vertex, x): Vertex ±¸Á¶Ã¼ÀÇ ½ÃÀÛ ÁöÁ¡À¸·ÎºÎÅÍ x ¸â¹ö±îÁöÀÇ ¹ÙÀÌÆ® ¿ÀÇÁ¼ÂÀ» °è»ê -> 0Byte
-        
-    glEnableVertexAttribArray(0);
-    // glEnableVertexAttribArray(index): VAOÀÇ index¹ø Á¤Á¡ ¼Ó¼ºÀ» È°¼ºÈ­ÇÏ´Â ÇÔ¼ö
-
-    glVertexAttribPointer(
-        1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-        reinterpret_cast<void*>(offsetof(Vertex, r))
-    );
-    glEnableVertexAttribArray(1);
-    // À§¿Í µ¿ÀÏ
-
-    // ==========================
-    // DSA ¹æ½Ä (OpenGL 4.5 ÀÌ»ó)
-    // ==========================
-    glCreateVertexArrays(1, &mesh.vao);
-    // glCreateVertexArrays(n, *arrays): ID¸¦ ¹ß±ŞÇÏ¸é¼­ ½ÇÁ¦ VAO °´Ã¼±îÁö »ı¼ºÇÏ°í ÃÊ±âÈ­ÇÏ´Â ÇÔ¼ö
-        // glGenVertexArrays() + glBindVertexArray() ÀÌ´Ù. ´Ù¸¸, °´Ã¼¸¦ ¼³Á¤ÇÒ ¶§ ¹ÙÀÎµù ÀÇÁ¸¼ºÀ» ÁÙ¿©ÁÖ´Â °ÍÀÏ»Ó, ·»´õ¸µ ½Ã ÇÊ¿äÇÑ ¹ÙÀÎµù±îÁö ÀüºÎ ¾ø¾Ö´Â ÇÔ¼ö´Â ¾Æ´Ï´Ù.
-
-    glCreateBuffers(1, &mesh.vbo);
-    // glCreateBuffers(n, *buffers): ¹öÆÛ ID¸¦ ¹ß±ŞÇÏ¸é¼­ ½ÇÁ¦ ¹öÆÛ °´Ã¼±îÁö »ı¼ºÇÏ°í ÃÊ±âÈ­ÇÏ´Â ÇÔ¼ö
-        // ¹öÆÛ °´Ã¼¸¦ »ı¼ºÇÑ °Í°ú ¹öÆÛ¿¡ ½ÇÁ¦ Á¤Á¡ µ¥ÀÌÅÍ¸¦ ÀúÀåÇÏ´Â °ÍÀº º°°³ÀÌ´Ù.
-
-    glNamedBufferStorage(
-        mesh.vbo,
-        vertices.size() * sizeof(Vertex),
-        vertices.data(),
-        0
-    );
-    // glNamedBufferStorage(buffer, size, *data, flags): buffer¸¦ Á÷Á¢ ÁöÁ¤ÇØ¼­ µ¥ÀÌÅÍ¸¦ ÀúÀåÇÏ´Â ÇÔ¼ö
-        // DSA¿¡¼­´Â ¹öÆÛ ID¸¦ Á÷Á¢ ÁöÁ¤ÇØ¼­ µ¥ÀÌÅÍ¸¦ ÀúÀåÇÒ ¼ö ÀÖ´Ù.
-        // buffer = µ¥ÀÌÅÍ¸¦ ÀúÀåÇÒ ¹öÆÛ °´Ã¼ ID
-        // size = ÇÒ´çÇÒ ÀúÀå °ø°£ÀÇ Å©±â
-        // *data = º¹»çÇÒ CPU µ¥ÀÌÅÍÀÇ ½ÃÀÛÁÖ¼Ò
-        // flags = ÀúÀå¼Ò »ı¼º ¿É¼Ç (ÇÊ¿äÇÑ ÇÃ·¡±×´Â ºñÆ® OR ¿¬»êÀÚ '|'·Î °áÇÕ °¡´É)
-            // 0 = Ãß°¡ ¿É¼Ç ¾øÀ½
-            // GL_DYNAMIC_STORAGE_BIT = glNamedBufferSubData() µîÀ¸·Î µ¥ÀÌÅÍ °»½Å Çã¿ë
-            // GL_MAP_READ_BIT = ¹öÆÛ ÀúÀå¼Ò¸¦ ÀĞ±â ¸ÅÇÎÇÒ ¼ö ÀÖµµ·Ï Çã¿ë
-            // GL_MAP_WRITE_BIT = ¹öÆÛ ÀúÀå¼Ò¸¦ ¾²±â ¸ÅÇÎÇÒ ¼ö ÀÖµµ·Ï Çã¿ë
-        // glNamedBufferStorage()´Â ºÒº¯ ÀúÀå¼ÒÀÌ´Ù. glBufferData()´Â °°Àº ¹öÆÛ °´Ã¼ÀÇ "ÀúÀå °ø°£"À» ÀçÇÒ´ç ÇÒ ¼ö ÀÖÁö¸¸ glNamedBufferStorage()´Â ÀçÇÒ´çÇÒ ¼ö ¾ø´Ù. ´Ü µ¥ÀÌÅÍ´Â º¯°æ°¡´ÉÇÏ´Ù.
-
-    glCreateBuffers(1, &mesh.ebo);
-    glNamedBufferStorage(
-        mesh.ebo,
-        indices.size() * sizeof(unsigned),
-        indices.data(),
-        0
-    );
-
-    glVertexArrayVertexBuffer(mesh.vao, 0, mesh.vbo, 0, sizeof(Vertex));
-    // glVertexArrayVertexBuffer(vaobj, bindingindex, buffer, offset, stride): VAOÀÇ "Binding Index"¿¡ VBO¸¦ ¿¬°áÇÏ´Â ÇÔ¼ö
-        // vaobj = ¿¬°áÇÒ VAO ID
-        // bindingindex = VAO ³»ºÎÀÇ ¹öÆÛ ¹ÙÀÎµù ½½·ÔÀÇ ¹øÈ£
-        // buffer = VAO¿¡ ¿¬°áÇÒ VBO ID
-        // offset = VBO ½ÃÀÛ ÁöÁ¡¿¡¼­ ¹ÙÀÎµùÀÌ ½ÃÀÛÇÏ´Â ¹ÙÀÌÆ® À§Ä¡
-        // stride = °°Àº VBO ³»ºÎ¿¡¼­ ´ÙÀ½ µ¥ÀÌÅÍ·Î ÀÌµ¿ÇÏ±â À§ÇÑ ¹ÙÀÌÆ® °£°İ
-
-    glVertexArrayAttribBinding(mesh.vao, 0, 0);
-    glVertexArrayAttribBinding(mesh.vao, 1, 0);
-    // glVertexArrayAttribBinding(vaobj, attribindex, bindingindex): vaobjÀÇ attribindex¹ø ¼Ó¼ºÀ» bindingindex¹ø¿¡ ¿¬°áÇÏ´Â ÇÔ¼ö
-
-    glVertexArrayAttribFormat(mesh.vao, 0, 2, GL_FLOAT, GL_FALSE, offsetof(Vertex, x));
-    // glVertexArrayAttribFormat(vaobj, attribindex, size, type, normalized, relativeoffset): vaobjÀÇ attribindex¹øÀÇ ¼Ó¼º Çü½ÄÀ» °áÁ¤ÇÏ´Â ÇÔ¼ö
-        // relativeoffset = BindingOffsetÀ» ±âÁØÀ¸·Î ÇÏ´Â »ó´ëÀûÀÎ À§Ä¡
-            // µ¥ÀÌÅÍ À§Ä¡ = BindingOffset + VertexIndex * stride + RelativeOffset
-
-    glEnableVertexArrayAttrib(mesh.vao, 0);
-    // glEnableVertexArrayAttrib(vaobj, index): ¿¬°áÇÒ vaobj¸¦ ÁöÁ¤ÇÏ°í ÇØ´ç VAOÀÇ index¹ø attribute¸¦ È°¼ºÈ­ÇÏ´Â ÇÔ¼ö
-    glVertexArrayElementBuffer(mesh.vao, mesh.ebo);
-    // glVertexArrayElementBuffer(vaobj, buffer): vaobj¿¡ buffer(ebo)¸¦ ¿¬°á
-
-    
-    
     mesh.indexCount=GLsizei(indices.size());
-    // drawÇÒ ÀÎµ¦½º °³¼ö¸¦ ±â¾ïÇÏ±â À§ÇØ indexCount¿¡ ÀúÀå (drawMesh()ÇÔ¼ö ¿¡´Â indices¸¦ ¸Å°³º¯¼ö·Î ¾È ¹Ş±â ¶§¹®.)
 }
 inline void drawMesh(const Mesh& mesh)
 {
@@ -233,14 +444,6 @@ inline void drawMesh(const Mesh& mesh)
     // TODO A1.6: bind VAO and issue the indexed draw call.
     // Hint: Use glBindVertexArray followed by glDrawElements(mode, count, type, indices), with GL_TRIANGLES, GL_UNSIGNED_INT, and nullptr for the EBO start offset.
     // Count means number of indices, not number of triangles.
-
     glBindVertexArray(mesh.vao);
     glDrawElements(GL_TRIANGLES, mesh.indexCount, GL_UNSIGNED_INT, nullptr);
-    // glDrawElements(mode, count, type, *indices)
-        // mode = ¾î¶² µµÇü(Primitive)À¸·Î ±×¸±Áö ¼±ÅÃ
-        // count = ÂüÁ¶ÇÒ ÀÎµ¦½º °³¼ö
-        // type = ÀÎµ¦½º ¿ä¼ÒÀÇ ÀÚ·áÇü
-        // *indices = EBO ³»ºÎ¿¡¼­ ÀÎµ¦½º µ¥ÀÌÅÍ¸¦ ÀĞ±â ½ÃÀÛÇÒ ¹ÙÀÌÆ® ¿ÀÇÁ¼Â
-            // nullptrÀº ¿ÀÇÁ¼Â 0À» ÀÇ¹Ì Áï, EBOÀÇ ¸Ç Ã³À½ºÎÅÍ ÀÎµ¦½º¸¦ ÀĞ´Â´Ù.
-            // EBO¸¦ ÂüÁ¶ÇÏ´Â °ÍÀº nullptr ÀÚÃ¼°¡ ¾Æ´Ï¶ó "ÀÌÀü¿¡ VAO¿¡ ÀúÀåÇØ µĞ EBO ¹ÙÀÎµù"ÀÌ´Ù.
 }
